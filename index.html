@@ -370,9 +370,22 @@ const errText=e=>({no_key:"Добавь ключ API в настройках.",b
 /* ===================== studio photos (Google Gemini image model) ===================== */
 const CAT_EN={top:"top",bottom:"pair of trousers, jeans or skirt",dress:"dress",outer:"coat or jacket",shoes:"pair of shoes",bag:"bag",acc:"accessory"};
 function studioPrompt(cat,bg){return `Turn this photo into a clean e-commerce product photo of the same ${CAT_EN[cat]||"piece of clothing"}. Show the item alone, front view, neatly smoothed and shaped as an invisible-mannequin packshot (shoes in a three-quarter side view), centered, filling about 80% of the square frame with even margins. Keep the exact same colour, fabric texture, pattern, print, stitching, buttons, hardware, logos and proportions as in the original photo. Soft, even studio light from above with a faint natural contact shadow. Seamless plain flat ${bg} background with no gradient or texture. Square 1:1 format.`}
-async function studioGen(srcCanvas,cat){
+async function listImageModels(key){
+  let r;try{r=await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",{headers:{"x-goog-api-key":key}})}catch{throw new Error("Нет интернета.")}
+  let j={};try{j=await r.json()}catch{}
+  if(!r.ok)throw new Error(r.status===400||r.status===403?"Google не принял ключ: "+((j.error&&j.error.message)||r.status):"Google ответил ошибкой "+r.status+((j.error&&j.error.message)?": "+j.error.message:""));
+  const ms=(j.models||[]).filter(m=>/image/i.test(m.name)&&!/imagen/i.test(m.name)&&(m.supportedGenerationMethods||[]).includes("generateContent")).map(m=>m.name.replace(/^models\//,""));
+  const score=n=>(/flash/.test(n)?100:0)+(/preview|exp/.test(n)?-5:0)+parseFloat((n.match(/(\d+(?:\.\d+)?)/)||[0,0])[1])*10;
+  return ms.sort((a,b)=>score(b)-score(a));
+}
+async function pickModel(key,force){
+  let m=lsGet("pr.gmodel","");if(m&&!force)return m;
+  const list=await listImageModels(key);if(!list.length)throw new Error("Для этого ключа Google не даёт ни одной модели, которая рисует картинки.");
+  const bad=lsGet("pr.gbad",[]);const ok=list.filter(x=>!bad.includes(x));lsSet("pr.gmodels",ok.length?ok:list);m=(ok.length?ok:list)[0];lsSet("pr.gmodel",m);return m;
+}
+async function studioGen(srcCanvas,cat,retried){
   const key=(lsGet("pr.gkey","")||"").trim();if(!key)throw new Error("Добавь ключ Google AI Studio в настройках.");
-  const model=lsGet("pr.gmodel","gemini-2.5-flash-image");
+  const model=await pickModel(key);
   const k=Math.min(1,1024/Math.max(srcCanvas.width,srcCanvas.height));const c=document.createElement("canvas");c.width=Math.round(srcCanvas.width*k);c.height=Math.round(srcCanvas.height*k);
   const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(srcCanvas,0,0,c.width,c.height);
   const b64=c.toDataURL("image/jpeg",.9).split(",")[1];
@@ -380,18 +393,18 @@ async function studioGen(srcCanvas,cat){
   let lum=0,n=0;try{const q=cutout(srcCanvas,45).canvas,dd=q.getContext("2d").getImageData(0,0,q.width,q.height).data;for(let i=0;i<dd.length;i+=32){if(dd[i+3]>200){lum+=.3*dd[i]+.59*dd[i+1]+.11*dd[i+2];n++}}}catch{}
   const light=n&&lum/n>175, bg=light?"charcoal grey (#3C3C3C)":"pure white (#FFFFFF)";
   let r;try{r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:"POST",headers:{"content-type":"application/json","x-goog-api-key":key},
-    body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:"image/jpeg",data:b64}},{text:studioPrompt(cat,bg)}]}],generationConfig:{responseModalities:["IMAGE"],imageConfig:{aspectRatio:"1:1"}}})})}
+    body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:"image/jpeg",data:b64}},{text:studioPrompt(cat,bg)}]}],generationConfig:{responseModalities:["TEXT","IMAGE"],imageConfig:{aspectRatio:"1:1"}}})})}
   catch{throw new Error("Нет интернета — студийному фото нужна сеть.")}
   let j={};try{j=await r.json()}catch{}
   if(!r.ok){const m=(j.error&&j.error.message)||"";
     if(r.status===400&&/API key/i.test(m))throw new Error("Ключ Google не подходит — проверь его в настройках.");
     if(r.status===403)throw new Error("Ключ Google не подходит или у проекта нет доступа к этой модели.");
-    if(r.status===404)throw new Error("Модель не найдена — выбери другую в настройках.");
+    if(r.status===404||(r.status===400&&/model|imageConfig|modalit/i.test(m))){if(!retried){lsSet("pr.gbad",[...new Set([...lsGet("pr.gbad",[]),model])]);const rest=lsGet("pr.gmodels",[]).filter(x=>x!==model);lsSet("pr.gmodels",rest);if(rest.length){lsSet("pr.gmodel",rest[0]);return studioGen(srcCanvas,cat,true)}}throw new Error("Модель "+model+" не подошла: "+m.slice(0,140))}
     if(r.status===429)throw new Error(/billing|quota/i.test(m)?"Лимит Google исчерпан — для генерации картинок может понадобиться включить оплату в Google AI Studio.":"Слишком много запросов подряд. Попробуй через минуту.");
     throw new Error("Google вернул ошибку"+(m?": "+m.slice(0,140):"."))}
   const parts=(j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[];
   const img=parts.filter(p=>(p.inlineData||p.inline_data)&&!p.thought).pop();
-  if(!img)throw new Error("ИИ не вернул картинку"+(j.candidates&&j.candidates[0]&&j.candidates[0].finishReason?" ("+j.candidates[0].finishReason+")":"")+". Попробуй ещё раз.");
+  if(!img){const fr=(j.candidates&&j.candidates[0]&&j.candidates[0].finishReason)||(j.promptFeedback&&j.promptFeedback.blockReason)||"";const tx=parts.map(p=>p.text||"").join(" ").trim();throw new Error("ИИ не вернул картинку"+(fr?" ("+fr+")":"")+(tx?": "+tx.slice(0,160):"")+". Нажми «Ещё вариант».")}
   const d=img.inlineData||img.inline_data;const el=new Image();el.src=`data:${d.mimeType||d.mime_type||"image/png"};base64,${d.data}`;await el.decode();
   const out=document.createElement("canvas");const kk=Math.min(1,1000/Math.max(el.naturalWidth,el.naturalHeight));out.width=Math.round(el.naturalWidth*kk);out.height=Math.round(el.naturalHeight*kk);
   out.getContext("2d").drawImage(el,0,0,out.width,out.height);return out;
@@ -427,18 +440,19 @@ function openSettings(){
     <div class="field"><span class="label">Студийные фото вещей</span>
       <span class="muted" style="font-size:14px">ИИ перерисует твоё фото в чистую предметную съёмку: вещь расправлена, на ровном свету. Нужен ключ Google AI Studio (aistudio.google.com → Get API key). Генерация платная, порядка нескольких центов за фото; хранится ключ только на телефоне.</span>
       <input type="password" id="gkey" value="${esc(lsGet("pr.gkey",""))}" placeholder="AIza…" autocomplete="off" aria-label="Ключ Google AI Studio" style="border:1px solid var(--line);background:var(--raised);border-radius:12px;padding:10px 12px;width:100%">
-      <div class="seg" id="gmod"><button data-v="gemini-2.5-flash-image">Быстро</button><button data-v="gemini-3-pro-image-preview">Качество</button></div>
-      <div class="row"><button class="btn primary sm" id="gSave">Сохранить ключ</button>${lsGet("pr.gkey","")?`<button class="btn sm danger ghost" id="gDel">Удалить ключ</button>`:""}</div>
+      <select id="gmod" aria-label="Модель" style="border:1px solid var(--line);background:var(--raised);border-radius:12px;padding:10px 12px;width:100%"></select>
+      <div class="row"><button class="btn primary sm" id="gSave">Сохранить и проверить</button>${lsGet("pr.gkey","")?`<button class="btn sm danger ghost" id="gDel">Удалить ключ</button>`:""}</div>
       <span id="gRes" class="muted" style="font-size:13px"></span></div>
     <div class="field"><span class="label">Резервная копия</span>
       <span class="muted" style="font-size:14px">Всё хранится на телефоне. Раз в пару недель сохраняй копию в «Файлы» или iCloud — тогда гардероб не пропадёт при смене телефона.</span>
       <div class="row"><button class="btn sm" id="bExp">Сохранить копию</button><label class="btn sm" for="bImp">Восстановить из копии</label><input type="file" id="bImp" accept=".json,application/json" hidden></div>
       <span id="bRes" class="muted" style="font-size:13px"></span></div>
-    <div class="field"><span class="label">О приложении</span><span class="muted" style="font-size:14px">${S.items.length} ${plural(S.items.length,"вещь","вещи","вещей")}, ${S.outfits.length} ${plural(S.outfits.length,"образ","образа","образов")}. Работает без интернета, кроме стилиста и распознавания.</span></div>`,sh=>{
+    <div class="field"><span class="label">О приложении</span><span class="muted" style="font-size:14px">${S.items.length} ${plural(S.items.length,"вещь","вещи","вещей")}, ${S.outfits.length} ${plural(S.outfits.length,"образ","образа","образов")}. Работает без интернета, кроме стилиста и распознавания. Версия 8.</span></div>`,sh=>{
     const res=sh.querySelector("#kRes");
-    const gm=()=>sh.querySelectorAll("#gmod button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===lsGet("pr.gmodel","gemini-2.5-flash-image")));gm();
-    sh.querySelector("#gmod").onclick=e=>{const b=e.target.closest("button");if(b){lsSet("pr.gmodel",b.dataset.v);gm()}};
-    sh.querySelector("#gSave").onclick=()=>{const gv=sh.querySelector("#gkey").value.trim();if(gv&&/^sk-ant/.test(gv)){sh.querySelector("#gRes").textContent="Это ключ Anthropic — он для стилиста, вставь его в поле выше. Здесь нужен ключ Google (AIza…).";return}lsSet("pr.gkey",gv);refreshStudio();sh.querySelector("#gRes").textContent=studioFn?"Ключ сохранён. При добавлении вещи появится режим «Студия ИИ».":"Ключ удалён."};
+    const gsel=sh.querySelector("#gmod"),fillM=()=>{const l=lsGet("pr.gmodels",[]),cur=lsGet("pr.gmodel","");gsel.innerHTML=l.length?l.map(m=>`<option value="${esc(m)}" ${m===cur?"selected":""}>${esc(m)}</option>`).join(""):`<option value="">Модель подберётся после проверки ключа</option>`;gsel.disabled=!l.length};fillM();
+    gsel.onchange=()=>lsSet("pr.gmodel",gsel.value);
+    sh.querySelector("#gSave").onclick=async()=>{const gv=sh.querySelector("#gkey").value.trim();if(gv&&/^sk-ant/.test(gv)){sh.querySelector("#gRes").textContent="Это ключ Anthropic — он для стилиста, вставь его в поле выше. Здесь нужен ключ Google (AIza…).";return}lsSet("pr.gkey",gv);refreshStudio();const gr=sh.querySelector("#gRes");if(!gv){gr.textContent="Ключ удалён.";return}
+      gr.innerHTML=`<span class="spinner"></span> Проверяю ключ…`;try{const m=await pickModel(gv,true);fillM();gr.innerHTML=`<span style="color:var(--good)">Работает.</span> Модель: ${esc(m)}. При добавлении вещи включится «Студия ИИ».`}catch(e){gr.textContent=e.message}};
     const gd=sh.querySelector("#gDel");if(gd)gd.onclick=()=>{lsSet("pr.gkey","");refreshStudio();closeSheet();toast("Ключ Google удалён")};
     const isG=v=>/^AIza/.test(v);
     sh.querySelector("#kSave").onclick=()=>{const v=sh.querySelector("#key").value.trim();
