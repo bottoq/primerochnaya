@@ -305,7 +305,7 @@ const EX_TRIPS=[{id:"ext1",name:"Львов на выходные",start:"",end:
 const S={items:[],outfits:[],plans:[],trips:[],ready:false,kind:"loading",tab:lsGet("pr.tab","closet"),
   filter:{cat:"all",color:null,q:"",forgotten:false},looksSeg:"build",planSeg:"cal",month:null,
   build:{mode:"sep",idx:{},lock:{},none:{outer:true,bag:true,acc:true}},chat:lsGet("pr.chat",[]),busy:false};
-let backend=null, sampleFn=null, downloads=null, sampleImages=false;
+let backend=null, sampleFn=null, studioFn=null, downloads=null, sampleImages=false;
 
 function demo(){return S.ready? S.items.length===0 : true}
 function V(){return demo()?{items:EX_ITEMS,outfits:EX_OUTFITS,plans:exPlans(),trips:EX_TRIPS}:{items:S.items,outfits:S.outfits,plans:S.plans,trips:S.trips}}
@@ -353,8 +353,39 @@ async function callClaude(input,opts={}){
 function refreshAI(){const k=lsGet("pr.key","");sampleFn=k?{json:callClaude}:null;sampleImages=!!k}
 const errText=e=>({no_key:"Добавь ключ API в настройках.",bad_key:"Ключ API не подходит — проверь его в настройках.",rate_limited:"Слишком много запросов подряд. Попробуй через минуту.",no_credit:"На аккаунте API закончился баланс.",offline:"Нет интернета — стилисту нужна сеть."}[e&&e.code]||"Не получилось ответить. Попробуй переформулировать.");
 
+/* ===================== studio photos (Google Gemini image model) ===================== */
+const CAT_EN={top:"top",bottom:"pair of trousers, jeans or skirt",dress:"dress",outer:"coat or jacket",shoes:"pair of shoes",bag:"bag",acc:"accessory"};
+function studioPrompt(cat,bg){return `Turn this photo into a clean e-commerce product photo of the same ${CAT_EN[cat]||"piece of clothing"}. Show the item alone, front view, neatly smoothed and shaped as an invisible-mannequin packshot (shoes in a three-quarter side view), centered, filling about 80% of the square frame with even margins. Keep the exact same colour, fabric texture, pattern, print, stitching, buttons, hardware, logos and proportions as in the original photo. Soft, even studio light from above with a faint natural contact shadow. Seamless plain flat ${bg} background with no gradient or texture. Square 1:1 format.`}
+async function studioGen(srcCanvas,cat){
+  const key=(lsGet("pr.gkey","")||"").trim();if(!key)throw new Error("Добавь ключ Google AI Studio в настройках.");
+  const model=lsGet("pr.gmodel","gemini-2.5-flash-image");
+  const k=Math.min(1,1024/Math.max(srcCanvas.width,srcCanvas.height));const c=document.createElement("canvas");c.width=Math.round(srcCanvas.width*k);c.height=Math.round(srcCanvas.height*k);
+  const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(srcCanvas,0,0,c.width,c.height);
+  const b64=c.toDataURL("image/jpeg",.9).split(",")[1];
+  // light garments get a dark backdrop so the cut-out keeps their edges
+  let lum=0,n=0;try{const q=cutout(srcCanvas,45).canvas,dd=q.getContext("2d").getImageData(0,0,q.width,q.height).data;for(let i=0;i<dd.length;i+=32){if(dd[i+3]>200){lum+=.3*dd[i]+.59*dd[i+1]+.11*dd[i+2];n++}}}catch{}
+  const light=n&&lum/n>175, bg=light?"charcoal grey (#3C3C3C)":"pure white (#FFFFFF)";
+  let r;try{r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:"POST",headers:{"content-type":"application/json","x-goog-api-key":key},
+    body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:"image/jpeg",data:b64}},{text:studioPrompt(cat,bg)}]}],generationConfig:{responseModalities:["IMAGE"],imageConfig:{aspectRatio:"1:1"}}})})}
+  catch{throw new Error("Нет интернета — студийному фото нужна сеть.")}
+  let j={};try{j=await r.json()}catch{}
+  if(!r.ok){const m=(j.error&&j.error.message)||"";
+    if(r.status===400&&/API key/i.test(m))throw new Error("Ключ Google не подходит — проверь его в настройках.");
+    if(r.status===403)throw new Error("Ключ Google не подходит или у проекта нет доступа к этой модели.");
+    if(r.status===404)throw new Error("Модель не найдена — выбери другую в настройках.");
+    if(r.status===429)throw new Error(/billing|quota/i.test(m)?"Лимит Google исчерпан — для генерации картинок может понадобиться включить оплату в Google AI Studio.":"Слишком много запросов подряд. Попробуй через минуту.");
+    throw new Error("Google вернул ошибку"+(m?": "+m.slice(0,140):"."))}
+  const parts=(j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[];
+  const img=parts.find(p=>p.inlineData||p.inline_data);
+  if(!img)throw new Error("ИИ не вернул картинку"+(j.candidates&&j.candidates[0]&&j.candidates[0].finishReason?" ("+j.candidates[0].finishReason+")":"")+". Попробуй ещё раз.");
+  const d=img.inlineData||img.inline_data;const el=new Image();el.src=`data:${d.mimeType||d.mime_type||"image/png"};base64,${d.data}`;await el.decode();
+  const out=document.createElement("canvas");const kk=Math.min(1,1000/Math.max(el.naturalWidth,el.naturalHeight));out.width=Math.round(el.naturalWidth*kk);out.height=Math.round(el.naturalHeight*kk);
+  out.getContext("2d").drawImage(el,0,0,out.width,out.height);return out;
+}
+function refreshStudio(){studioFn=lsGet("pr.gkey","")?studioGen:null}
+
 async function boot(){
-  backend=localBackend();S.kind="local";refreshAI();render();
+  backend=localBackend();S.kind="local";refreshAI();refreshStudio();render();
   let pending=COLS.length;
   COLS.forEach(n=>backend.subscribe(n,rows=>{S[n]=rows;if(pending>0&&--pending===0){S.ready=true;S.anim=true}render()}));
   setTimeout(()=>{if(!S.ready){S.ready=true;render()}},3000);
@@ -379,12 +410,22 @@ function openSettings(){
       <input type="password" id="key" value="${esc(k)}" placeholder="sk-ant-…" autocomplete="off" aria-label="Ключ API" style="border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;width:100%">
       <div class="row"><button class="btn primary sm" id="kSave">Сохранить ключ</button><button class="btn sm" id="kTest">Проверить</button>${k?`<button class="btn sm danger ghost" id="kDel">Удалить ключ</button>`:""}</div>
       <span id="kRes" class="muted" style="font-size:13px"></span></div>
+    <div class="field"><span class="label">Студийные фото вещей</span>
+      <span class="muted" style="font-size:14px">ИИ перерисует твоё фото в чистую предметную съёмку: вещь расправлена, на ровном свету. Нужен ключ Google AI Studio (aistudio.google.com → Get API key). Генерация платная, порядка нескольких центов за фото; хранится ключ только на телефоне.</span>
+      <input type="password" id="gkey" value="${esc(lsGet("pr.gkey",""))}" placeholder="AIza…" autocomplete="off" aria-label="Ключ Google AI Studio" style="border:1px solid var(--line);background:var(--raised);border-radius:12px;padding:10px 12px;width:100%">
+      <div class="seg" id="gmod"><button data-v="gemini-2.5-flash-image">Быстро</button><button data-v="gemini-3-pro-image-preview">Качество</button></div>
+      <div class="row"><button class="btn primary sm" id="gSave">Сохранить ключ</button>${lsGet("pr.gkey","")?`<button class="btn sm danger ghost" id="gDel">Удалить ключ</button>`:""}</div>
+      <span id="gRes" class="muted" style="font-size:13px"></span></div>
     <div class="field"><span class="label">Резервная копия</span>
       <span class="muted" style="font-size:14px">Всё хранится на телефоне. Раз в пару недель сохраняй копию в «Файлы» или iCloud — тогда гардероб не пропадёт при смене телефона.</span>
       <div class="row"><button class="btn sm" id="bExp">Сохранить копию</button><label class="btn sm" for="bImp">Восстановить из копии</label><input type="file" id="bImp" accept=".json,application/json" hidden></div>
       <span id="bRes" class="muted" style="font-size:13px"></span></div>
     <div class="field"><span class="label">О приложении</span><span class="muted" style="font-size:14px">${S.items.length} ${plural(S.items.length,"вещь","вещи","вещей")}, ${S.outfits.length} ${plural(S.outfits.length,"образ","образа","образов")}. Работает без интернета, кроме стилиста и распознавания.</span></div>`,sh=>{
     const res=sh.querySelector("#kRes");
+    const gm=()=>sh.querySelectorAll("#gmod button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===lsGet("pr.gmodel","gemini-2.5-flash-image")));gm();
+    sh.querySelector("#gmod").onclick=e=>{const b=e.target.closest("button");if(b){lsSet("pr.gmodel",b.dataset.v);gm()}};
+    sh.querySelector("#gSave").onclick=()=>{lsSet("pr.gkey",sh.querySelector("#gkey").value.trim());refreshStudio();sh.querySelector("#gRes").textContent=studioFn?"Ключ сохранён. При добавлении вещи появится режим «Студия ИИ».":"Ключ удалён."};
+    const gd=sh.querySelector("#gDel");if(gd)gd.onclick=()=>{lsSet("pr.gkey","");refreshStudio();closeSheet();toast("Ключ Google удалён")};
     sh.querySelector("#kSave").onclick=()=>{lsSet("pr.key",sh.querySelector("#key").value.trim());refreshAI();res.textContent="Ключ сохранён.";render()};
     sh.querySelector("#kTest").onclick=async()=>{lsSet("pr.key",sh.querySelector("#key").value.trim());refreshAI();res.innerHTML=`<span class="spinner"></span> Проверяю…`;
       try{await callClaude('Ответь только JSON {"ok":true}',{modelTier:"quick"});res.innerHTML=`<span style="color:var(--good)">Работает.</span>`}catch(e){res.textContent=errText(e)}};
@@ -485,12 +526,13 @@ $("#fileIn").onchange=e=>{addQueue=[...e.target.files];e.target.value="";if(addQ
 async function nextAdd(total){
   const f=addQueue.shift();if(!f)return;const n=total-addQueue.length;
   let src;try{src=await fileToCanvas(f)}catch{toast("Не удалось открыть фото");return nextAdd(total)}
-  const st={strength:45,cut:true,res:null,name:"",cat:"top",colors:[],seasons:[],brand:"",price:"",ai:false};
+  const st={strength:45,mode:studioFn?"studio":"cut",studio:null,busy:false,res:null,name:"",cat:"top",colors:[],seasons:[],brand:"",price:"",ai:false};
   openSheet(`${hd(total>1?`Новая вещь · ${n} из ${total}`:"Новая вещь")}
     <div class="preview" id="pv"></div>
-    <div class="field"><div class="spread"><span class="label">Удаление фона</span><label class="row" style="font-size:14px"><input type="checkbox" id="cutT" checked> вырезать</label></div>
-      <input type="range" id="str" min="0" max="100" value="45" aria-label="Сила удаления фона"><div class="spread label" style="font-size:10px"><span>бережно</span><span>сильнее</span></div>
-      <div class="muted" id="cutHint" style="font-size:13px">Лучше всего работает, если вещь снята на ровном фоне: стена, кровать, пол.</div></div>
+    <div class="seg" id="modeS">${studioFn?`<button data-m="studio">Студия ИИ</button>`:""}<button data-m="cut">Вырезать фон</button><button data-m="orig">Как есть</button></div>
+    <div class="field" id="cutBox"><input type="range" id="str" min="0" max="100" value="45" aria-label="Сила удаления фона"><div class="spread label" style="font-size:10px"><span>бережно</span><span>сильнее</span></div></div>
+    <div class="row" id="studioBox"><button class="btn sm" id="again">Ещё вариант</button></div>
+    <div class="muted" id="cutHint" style="font-size:13px"></div>
     <div class="field"><label class="label" for="nm">Название</label><input type="text" id="nm" placeholder="Например, льняная рубашка"></div>
     <div class="field"><span class="label">Категория</span><div class="chips" id="catC">${CATS.map(c=>`<button class="chip" data-v="${c.k}">${c.n}</button>`).join("")}</div></div>
     <div class="field"><span class="label">Цвет</span><div class="swatches" id="colC">${COLORS.map(([n,h])=>`<button class="sw" data-v="${n}" title="${n}" aria-label="${n}" style="background:${h}"></button>`).join("")}</div></div>
@@ -503,12 +545,24 @@ async function nextAdd(total){
       sh.querySelectorAll("#colC .sw").forEach(b=>b.setAttribute("aria-pressed",st.colors.includes(b.dataset.v)));
       sh.querySelectorAll("#seaC .chip").forEach(b=>b.setAttribute("aria-pressed",st.seasons.includes(b.dataset.v)));
       sh.querySelector("#nm").value=st.name;sh.querySelector("#br").value=st.brand};
-    const redo=()=>{let r=st.cut?cutout(src,st.strength):{canvas:src,ok:true};st.res=r.canvas;pv.innerHTML="";pv.appendChild(r.canvas);
-      sh.querySelector("#cutHint").textContent=st.cut&&!r.ok?"Фон не распознался: оставила фото целиком. Попробуй сдвинуть ползунок или сними вещь на однотонном фоне.":"Лучше всего работает, если вещь снята на ровном фоне: стена, кровать, пол.";
-      if(!st.colors.length){st.colors=detectColors(r.canvas);syncUI()}};
+    const hint=sh.querySelector("#cutHint"),okB=sh.querySelector("#ok");
+    const show=c=>{st.res=c;pv.innerHTML="";pv.appendChild(c);if(!st.colors.length){st.colors=detectColors(c);syncUI()}};
+    const gen=async()=>{st.busy=true;okB.disabled=true;sh.querySelector("#again").disabled=true;
+      pv.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--muted);font-size:14px"><span class="spinner"></span>Снимаю студийное фото…</div>`;hint.textContent="Обычно 5–15 секунд.";
+      try{st.studio=await studioFn(src,st.cat);if(st.mode==="studio")redo()}
+      catch(e){hint.textContent=(e&&e.message)||"Не получилось сгенерировать.";if(st.mode==="studio"){st.mode="cut";redo()}}
+      st.busy=false;okB.disabled=false;sh.querySelector("#again").disabled=false};
+    const redo=()=>{
+      sh.querySelectorAll("#modeS button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===st.mode));
+      sh.querySelector("#cutBox").hidden=st.mode!=="cut";sh.querySelector("#studioBox").hidden=st.mode!=="studio";
+      if(st.mode==="orig"){show(src);hint.textContent="";return}
+      if(st.mode==="studio"){if(!st.studio){if(!st.busy)gen();return}const r=cutout(st.studio,30);show(r.canvas);hint.textContent="Сгенерировано ИИ по твоему фото. Проверь цвет и детали — если что-то не так, нажми «Ещё вариант».";return}
+      const r=cutout(src,st.strength);show(r.canvas);
+      hint.textContent=r.ok?"Лучше всего работает, если вещь снята на ровном фоне: стена, кровать, пол.":"Фон не распознался: оставила фото целиком. Сдвинь ползунок или сними вещь на однотонном фоне.";};
     redo();syncUI();
+    sh.querySelector("#modeS").onclick=e=>{const b=e.target.closest("button");if(!b||st.busy)return;st.mode=b.dataset.m;redo()};
+    sh.querySelector("#again").onclick=()=>{if(!st.busy){st.studio=null;gen()}};
     let t;sh.querySelector("#str").oninput=e=>{st.strength=+e.target.value;clearTimeout(t);t=setTimeout(redo,120)};
-    sh.querySelector("#cutT").onchange=e=>{st.cut=e.target.checked;redo()};
     sh.querySelector("#catC").onclick=e=>{const b=e.target.closest(".chip");if(b){st.cat=b.dataset.v;syncUI()}};
     sh.querySelector("#colC").onclick=e=>{const b=e.target.closest(".sw");if(!b)return;const v=b.dataset.v;st.colors=st.colors.includes(v)?st.colors.filter(x=>x!==v):[...st.colors,v].slice(-3);syncUI()};
     sh.querySelector("#seaC").onclick=e=>{const b=e.target.closest(".chip");if(!b)return;const v=b.dataset.v;st.seasons=st.seasons.includes(v)?st.seasons.filter(x=>x!==v):[...st.seasons,v];syncUI()};
