@@ -1,0 +1,21 @@
+name: Pinterest pins
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+  push:
+    paths: ["pins-source.txt", "tools/pins.py", ".github/workflows/pins.yml"]
+permissions:
+  contents: write
+jobs:
+  pins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/pins.py
+      - name: Commit inspo.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add inspo.json
+          git diff --cached --quiet || (git commit -m "Обновить пины" && git push)
