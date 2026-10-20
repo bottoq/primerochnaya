@@ -413,7 +413,37 @@ async function studioGen(srcCanvas,cat,retried){
 let bgLoad=null;
 function loadBg(){if(!bgLoad)bgLoad=new Promise((res,rej)=>{const sc=document.createElement("script");sc.src="bg/bgremove.js";sc.onload=res;sc.onerror=()=>{bgLoad=null;rej(new Error("нейросеть не загрузилась — нужен интернет в первый раз"))};document.head.appendChild(sc)});return bgLoad}
 bgRemoveFn=async(blob,onProgress)=>{await loadBg();return window.imglyRemoveBackground(blob,{publicPath:new URL("bg/",location.href).href,model:"small",device:"cpu",output:{format:"image/png"},progress:(k,c,t)=>{try{onProgress&&onProgress(k,c,t)}catch{}}})};
-function refreshStudio(){studioFn=lsGet("pr.gkey","")?studioGen:null}
+/* Pollinations (gen.pollinations.ai) — OpenAI-style image edits with the user's own key */
+async function polliModels(){
+  let r;try{r=await fetch("https://gen.pollinations.ai/image/models")}catch{throw new Error("Нет связи с Pollinations.")}
+  if(!r.ok)throw new Error("Pollinations не отдал список моделей ("+r.status+").");
+  const j=await r.json();const arr=Array.isArray(j)?j:(j.data||j.models||[]);
+  const names=arr.map(m=>{if(typeof m==="string")return{id:m,img:/kontext|gemini|seedream|edit|klein|gpt-?image|nano/i.test(m)};
+    const id=m.id||m.name||m.model;const inp=JSON.stringify(m.input_modalities||m.inputModalities||m.input||m.capabilities||"");return{id,img:/image/i.test(inp)||/kontext|gemini|seedream|edit|klein|gpt-?image|nano/i.test(id||"")}}).filter(m=>m.id);
+  const pref=n=>(/kontext/i.test(n)?50:0)+(/gemini/i.test(n)?40:0)+(/seedream/i.test(n)?30:0);
+  return names.filter(m=>m.img).map(m=>m.id).sort((a,b)=>pref(b)-pref(a));
+}
+async function polliGen(srcCanvas,cat){
+  const key=(lsGet("pr.pkey","")||"").trim();if(!key)throw new Error("Добавь ключ Pollinations в настройках.");
+  let model=lsGet("pr.pmodel","");if(!model){const l=await polliModels();lsSet("pr.pmodels",l);model=l[0]||"black-forest-labs/flux.1-kontext-pro";lsSet("pr.pmodel",model)}
+  const k=Math.min(1,1024/Math.max(srcCanvas.width,srcCanvas.height));const c=document.createElement("canvas");c.width=Math.round(srcCanvas.width*k);c.height=Math.round(srcCanvas.height*k);
+  const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(srcCanvas,0,0,c.width,c.height);
+  const blob=await canvasBlob(c,"image/jpeg",.9);
+  const fd=new FormData();fd.append("image",blob,"item.jpg");fd.append("prompt",studioPrompt(cat,"pure white (#FFFFFF)"));fd.append("model",model);fd.append("size","1024x1024");fd.append("response_format","b64_json");
+  let r;try{r=await fetch("https://gen.pollinations.ai/v1/images/edits",{method:"POST",headers:{Authorization:"Bearer "+key},body:fd})}catch{throw new Error("Pollinations не ответил (нет интернета или сервис закрыл доступ из браузера).")}
+  let j={};try{j=await r.json()}catch{}
+  const m=(j.error&&(j.error.message||j.error))||j.message||"";
+  if(r.status===401)throw new Error("Ключ Pollinations не подходит.");
+  if(r.status===402)throw new Error("На аккаунте Pollinations закончилась «пыльца».");
+  if(r.status===429||r.status===503)throw new Error("Pollinations перегружен, попробуй через минуту.");
+  if(!r.ok)throw new Error("Pollinations: ошибка "+r.status+(m?" — "+String(m).slice(0,160):""));
+  const d=(j.data||[])[0]||{};let src=d.b64_json?"data:image/png;base64,"+d.b64_json:d.url;if(!src)throw new Error("Pollinations не вернул картинку.");
+  const el=new Image();el.crossOrigin="anonymous";el.src=src;await el.decode();
+  const out=document.createElement("canvas");const kk=Math.min(1,1000/Math.max(el.naturalWidth,el.naturalHeight));out.width=Math.round(el.naturalWidth*kk);out.height=Math.round(el.naturalHeight*kk);
+  out.getContext("2d").drawImage(el,0,0,out.width,out.height);return out;
+}
+function refreshStudio(){const p=lsGet("pr.pkey",""),g=lsGet("pr.gkey","");
+  studioFn=p&&g?async(c,cat)=>{try{return await polliGen(c,cat)}catch(e){try{return await studioGen(c,cat)}catch(e2){throw new Error(e.message+" Google: "+e2.message)}}}:p?polliGen:g?studioGen:null}
 
 async function boot(){
   backend=localBackend();S.kind="local";refreshAI();refreshStudio();render();
@@ -441,6 +471,12 @@ function openSettings(){
       <input type="password" id="key" value="${esc(k)}" placeholder="sk-ant-…" autocomplete="off" aria-label="Ключ API" style="border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;width:100%">
       <div class="row"><button class="btn primary sm" id="kSave">Сохранить ключ</button><button class="btn sm" id="kTest">Проверить</button>${k?`<button class="btn sm danger ghost" id="kDel">Удалить ключ</button>`:""}</div>
       <span id="kRes" class="muted" style="font-size:13px"></span></div>
+    <div class="field"><span class="label">Студийные фото · Pollinations</span>
+      <span class="muted" style="font-size:14px">Ключ с enter.pollinations.ai (раздел Secrets, начинается с sk_). Генерация списывает «пыльцу» с твоего аккаунта. Если ключ Google тоже есть, он будет запасным.</span>
+      <input type="password" id="pkey" value="${esc(lsGet("pr.pkey",""))}" placeholder="sk_…" autocomplete="off" aria-label="Ключ Pollinations" style="border:1px solid var(--line);background:var(--raised);border-radius:12px;padding:10px 12px;width:100%">
+      <select id="pmod" aria-label="Модель Pollinations" style="border:1px solid var(--line);background:var(--raised);border-radius:12px;padding:10px 12px;width:100%"></select>
+      <div class="row"><button class="btn primary sm" id="pSave">Сохранить и проверить</button></div>
+      <span id="pRes" class="muted" style="font-size:13px"></span></div>
     <div class="field"><span class="label">Студийные фото вещей</span>
       <span class="muted" style="font-size:14px">ИИ перерисует твоё фото в чистую предметную съёмку: вещь расправлена, на ровном свету. Нужен ключ Google AI Studio (aistudio.google.com → Get API key). Генерация платная, порядка нескольких центов за фото; хранится ключ только на телефоне.</span>
       <input type="password" id="gkey" value="${esc(lsGet("pr.gkey",""))}" placeholder="AIza…" autocomplete="off" aria-label="Ключ Google AI Studio" style="border:1px solid var(--line);background:var(--raised);border-radius:12px;padding:10px 12px;width:100%">
@@ -451,8 +487,15 @@ function openSettings(){
       <span class="muted" style="font-size:14px">Всё хранится на телефоне. Раз в пару недель сохраняй копию в «Файлы» или iCloud — тогда гардероб не пропадёт при смене телефона.</span>
       <div class="row"><button class="btn sm" id="bExp">Сохранить копию</button><label class="btn sm" for="bImp">Восстановить из копии</label><input type="file" id="bImp" accept=".json,application/json" hidden></div>
       <span id="bRes" class="muted" style="font-size:13px"></span></div>
-    <div class="field"><span class="label">О приложении</span><span class="muted" style="font-size:14px">${S.items.length} ${plural(S.items.length,"вещь","вещи","вещей")}, ${S.outfits.length} ${plural(S.outfits.length,"образ","образа","образов")}. Работает без интернета, кроме стилиста и распознавания. Версия 10.</span></div>`,sh=>{
+    <div class="field"><span class="label">О приложении</span><span class="muted" style="font-size:14px">${S.items.length} ${plural(S.items.length,"вещь","вещи","вещей")}, ${S.outfits.length} ${plural(S.outfits.length,"образ","образа","образов")}. Работает без интернета, кроме стилиста и распознавания. Версия 11.</span></div>`,sh=>{
     const res=sh.querySelector("#kRes");
+    const psel=sh.querySelector("#pmod"),fillP=()=>{const l=lsGet("pr.pmodels",[]),cur=lsGet("pr.pmodel","");psel.innerHTML=l.length?l.map(m=>`<option value="${esc(m)}" ${m===cur?"selected":""}>${esc(m)}</option>`).join(""):`<option value="">Модель подберётся после проверки</option>`;psel.disabled=!l.length};fillP();
+    psel.onchange=()=>lsSet("pr.pmodel",psel.value);
+    sh.querySelector("#pSave").onclick=async()=>{const v=sh.querySelector("#pkey").value.trim(),pr=sh.querySelector("#pRes");
+      if(v&&!/^sk_/.test(v)){pr.textContent=/^pk_/.test(v)?"Это ключ приложения (pk_). Нужен секретный ключ из раздела Secrets — он начинается с sk_.":"Ключ Pollinations начинается с sk_.";return}
+      lsSet("pr.pkey",v);refreshStudio();if(!v){pr.textContent="Ключ удалён.";return}
+      pr.innerHTML=`<span class="spinner"></span> Проверяю…`;try{const l=await polliModels();lsSet("pr.pmodels",l);if(!lsGet("pr.pmodel","")||!l.includes(lsGet("pr.pmodel","")))lsSet("pr.pmodel",l[0]||"");fillP();
+        pr.innerHTML=l.length?`<span style="color:var(--good)">Сохранено.</span> Модель: ${esc(lsGet("pr.pmodel",""))}. Хватит ли «пыльцы», станет видно на первой вещи.`:"Pollinations не показал моделей, которые умеют работать с фото."}catch(e){pr.textContent=e.message}};
     const gsel=sh.querySelector("#gmod"),fillM=()=>{const l=lsGet("pr.gmodels",[]),cur=lsGet("pr.gmodel","");gsel.innerHTML=l.length?l.map(m=>`<option value="${esc(m)}" ${m===cur?"selected":""}>${esc(m)}</option>`).join(""):`<option value="">Модель подберётся после проверки ключа</option>`;gsel.disabled=!l.length};fillM();
     gsel.onchange=()=>lsSet("pr.gmodel",gsel.value);
     sh.querySelector("#gSave").onclick=async()=>{const gv=sh.querySelector("#gkey").value.trim();if(gv&&/^sk-ant/.test(gv)){sh.querySelector("#gRes").textContent="Это ключ Anthropic — он для стилиста, вставь его в поле выше. Здесь нужен ключ Google (AIza…).";return}lsSet("pr.gkey",gv);refreshStudio();const gr=sh.querySelector("#gRes");if(!gv){gr.textContent="Ключ удалён.";return}
