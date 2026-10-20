@@ -308,6 +308,6 @@
   }
  ],
  "errors": [
-  "BoardResource: HTTP Error 403: Forbidden"
+  "BoardFeedResource: HTTP Error 403: Forbidden"
  ]
 }
