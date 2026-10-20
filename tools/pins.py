@@ -118,6 +118,13 @@ def main():
             errors.append(f + ": пустая лента")
         except Exception as e:
             errors.append(f"{f}: {e}")
+    # keep pins seen on earlier runs so the collection grows past the 50 the feed returns
+    try:
+        old = json.load(open("inspo.json")).get("pins", [])
+        ids = {p["id"] for p in pins}
+        pins += [p for p in old if p["id"] not in ids]
+    except Exception:
+        pass
     out = {"source": src, "resolved": url, "feed": used, "user": user, "count": len(pins), "board_total": total, "pins": pins[:400], "errors": errors}
     json.dump(out, open("inspo.json", "w"), ensure_ascii=False, indent=1)
     print(json.dumps({k: v for k, v in out.items() if k != "pins"}, ensure_ascii=False, indent=1))

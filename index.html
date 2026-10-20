@@ -157,6 +157,19 @@ h2{font-family:var(--f-display);font-weight:600;font-size:23px;line-height:1.1;l
 .composer{position:sticky;bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 8px);display:flex;gap:8px;align-items:flex-end;background:var(--bg);padding-block:8px}
 .composer textarea{flex:1;min-width:0;resize:none;border:1px solid var(--line);background:var(--raised);border-radius:20px;padding:10px 14px;min-height:44px;max-height:140px}
 
+/* inspiration */
+.inspo{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 6px}
+.inspo::-webkit-scrollbar{display:none}
+.inspo button{flex:0 0 92px;height:128px;border-radius:14px;overflow:hidden;border:1px solid var(--line);padding:0;background:var(--sunk);transition:transform .2s var(--ease)}
+.inspo button:active{transform:scale(.95)}
+.inspo img{width:100%;height:100%;object-fit:cover;display:block}
+.stylecard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 2px var(--shadow-ui)}
+.stylecard p{margin:0}
+.pal{display:flex;gap:6px;flex-wrap:wrap}
+.pal span{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:4px 10px 4px 4px;border-radius:999px;background:var(--tag)}
+.pal i{width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(46,33,38,.18)}
+.msg.me img{display:block;width:120px;border-radius:10px;margin-bottom:6px}
+
 /* tab bar */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:25;background:var(--glass);-webkit-backdrop-filter:saturate(1.3) blur(20px);backdrop-filter:saturate(1.3) blur(20px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
 nav.tabs .in{position:relative;max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);height:var(--tabh)}
@@ -304,7 +317,7 @@ const EX_TRIPS=[{id:"ext1",name:"Львов на выходные",start:"",end:
 /* ===================== state & storage ===================== */
 const S={items:[],outfits:[],plans:[],trips:[],ready:false,kind:"loading",tab:lsGet("pr.tab","closet"),
   filter:{cat:"all",color:null,q:"",forgotten:false},looksSeg:"build",planSeg:"cal",month:null,
-  build:{mode:"sep",idx:{},lock:{},none:{outer:true,bag:true,acc:true}},chat:lsGet("pr.chat",[]),busy:false};
+  build:{mode:"sep",idx:{},lock:{},none:{outer:true,bag:true,acc:true}},chat:lsGet("pr.chat",[]),busy:false,style:lsGet("pr.style",null)};
 let backend=null, sampleFn=null, studioFn=null, downloads=null, sampleImages=false;
 
 function demo(){return S.ready? S.items.length===0 : true}
@@ -342,15 +355,16 @@ function parseJSON(t){const a=t.indexOf("{"),b=t.lastIndexOf("}");if(a<0||b<a)th
 async function callClaude(input,opts={}){
   const key=(lsGet("pr.key","")||"").trim();if(!key)throw{code:"no_key"};
   const msgs=(typeof input==="string"?[{role:"user",content:input}]:input).map(m=>({role:m.role,content:m.content}));
-  if(opts.images&&opts.images.length){const last=msgs[msgs.length-1];const parts=[];
-    for(const b of opts.images){const d=await blobToDataURL(b);parts.push({type:"image",source:{type:"base64",media_type:(b.type||"image/jpeg"),data:d.split(",")[1]}})}
+  if((opts.images&&opts.images.length)||(opts.imageUrls&&opts.imageUrls.length)){const last=msgs[msgs.length-1];const parts=[];
+    for(const b of opts.images||[]){const d=await blobToDataURL(b);parts.push({type:"image",source:{type:"base64",media_type:(b.type||"image/jpeg"),data:d.split(",")[1]}})}
+    for(const u of opts.imageUrls||[])parts.push({type:"image",source:{type:"url",url:u}});
     parts.push({type:"text",text:last.content});last.content=parts}
   let r;try{r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
     body:JSON.stringify({model:opts.modelTier==="quick"?"claude-haiku-5-5":"claude-sonnet-5-5",max_tokens:2000,messages:msgs})})}catch(e){throw{code:"offline"}}
   if(!r.ok){let m="";try{m=(await r.json()).error?.message||""}catch{}throw{code:r.status===401?"bad_key":r.status===429?"rate_limited":/credit/i.test(m)?"no_credit":"upstream_error",message:m}}
   const j=await r.json();return parseJSON((j.content||[]).filter(c=>c.type==="text").map(c=>c.text).join(""));
 }
-function refreshAI(){const k=lsGet("pr.key","");sampleFn=k?{json:callClaude}:null;sampleImages=!!k}
+function refreshAI(){const k=lsGet("pr.key","");sampleFn=k?{json:callClaude,urls:true}:null;sampleImages=!!k}
 const errText=e=>({no_key:"Добавь ключ API в настройках.",bad_key:"Ключ API не подходит — проверь его в настройках.",rate_limited:"Слишком много запросов подряд. Попробуй через минуту.",no_credit:"На аккаунте API закончился баланс.",offline:"Нет интернета — стилисту нужна сеть."}[e&&e.code]||"Не получилось ответить. Попробуй переформулировать.");
 
 /* ===================== studio photos (Google Gemini image model) ===================== */
@@ -860,23 +874,33 @@ function openTrip(id){
 }
 
 /* ---------- stylist ---------- */
-const QUICK=["Офис, +12°, дождь","Свидание вечером","Выходной, гуляем весь день","Что надеть из давно забытого?","Чего не хватает в моём гардеробе?","Капсула на 5 дней из того, что есть"];
+const QUICK=["Образ в духе моего Пинтереста","Офис, +12°, дождь","Свидание вечером","Выходной, гуляем весь день","Что надеть из давно забытого?","Чего не хватает в моём гардеробе?","Капсула на 5 дней из того, что есть"];
 function wardrobeContext(){
   const {items,plans}=V();
   const list=items.map(i=>({id:i.id,name:i.name,cat:CAT[i.cat],colors:i.colors,seasons:i.seasons,brand:i.brand||undefined,worn:i.wearCount||0,last:i.lastWorn||undefined}));
   const recent=plans.filter(p=>p.worn).sort((a,b)=>b.id<a.id?-1:1).slice(0,7).map(p=>({date:p.id,look:outfitById(p.outfitId)?.name}));
   return `Сегодня ${fmtDay(todayISO())} ${new Date().getFullYear()}, Киев.
 Гардероб (JSON): ${JSON.stringify(list)}
-Недавно надетое: ${JSON.stringify(recent)}`;
+Недавно надетое: ${JSON.stringify(recent)}${S.style?`
+Её стиль по доске вдохновения в Pinterest: ${S.style.summary} Палитра: ${(S.style.palette||[]).map(c=>c.name).join(", ")}. Силуэты: ${(S.style.silhouettes||[]).join(", ")}. Ориентируйся на этот стиль, когда собираешь образы.`:""}`;
 }
 const SYS=`Ты — персональный стилист в приложении-гардеробе. Отвечай по-русски, коротко, конкретно, без комплиментов и восклицаний.
 Правила: в образы ставь только вещи из гардероба, по их id. Образ — 2–6 вещей: либо платье, либо верх + низ; одна пара обуви; верхнюю одежду добавляй по погоде. Учитывай сезон и то, что надевалось недавно (не повторяй вчерашнее). Если для запроса не хватает вещей — прямо скажи, чего не хватает, и предложи лучшее из имеющегося.
 Верни ТОЛЬКО JSON: {"reply":"2–4 предложения","outfits":[{"title":"короткое название","itemIds":["id",...],"why":"одно предложение"}]}. outfits может быть пустым, если вопрос не про образ.`;
 function renderStylist(){
   const on=!!sampleFn;
-  view.innerHTML=`${demoBanner()}
+  if(S.inspo===undefined){S.inspo=null;fetch("inspo.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&Array.isArray(j.pins)&&j.pins.length){S.inspo=j.pins;S.inspoBoard=(j.resolved||"").replace(/^.*pinterest\.[a-z.]+\/[^/]+\//,"").replace(/\/.*$/,"");if(S.tab==="stylist")render()}}).catch(()=>{})}
+  const pins=S.inspo||[],st=S.style;
+  const thumb=u=>u.replace("/736x/","/236x/");
+  const inspoHTML=pins.length?`<div class="field"><div class="spread"><span class="label">Вдохновение · Pinterest ${esc(S.inspoBoard||"")} · ${pins.length}</span>${on&&sampleFn.urls?`<button class="btn sm" id="anStyle" ${S.styleBusy?"disabled":""}>${S.styleBusy?`<span class="spinner"></span> Разбираю`:st?"Обновить стиль":"Разобрать мой стиль"}</button>`:""}</div>
+      <div class="inspo">${pins.map((p,i)=>`<button data-pin="${i}" aria-label="Пин ${i+1}"><img src="${esc(thumb(p.img))}" alt="" loading="lazy" referrerpolicy="no-referrer"></button>`).join("")}</div></div>
+    ${st?`<div class="stylecard"><span class="label">Твой стиль по Пинтересту</span><p>${esc(st.summary)}</p>
+      ${(st.palette||[]).length?`<div class="pal">${st.palette.map(c=>`<span><i style="background:${esc(/^#[0-9a-f]{6}$/i.test(c.hex||"")?c.hex:"#ccc")}"></i>${esc(c.name)}</span>`).join("")}</div>`:""}
+      ${(st.silhouettes||[]).length?`<div class="muted" style="font-size:14px">Силуэты: ${esc(st.silhouettes.join(", "))}</div>`:""}
+      ${(st.missing||[]).length?`<div class="field"><span class="label">Чего не хватает до этих образов</span>${st.missing.map(m=>`<div style="font-size:14px"><b>${esc(m.name)}</b> <span class="muted">— ${esc(m.why)}</span></div>`).join("")}</div>`:""}</div>`:""}`:"";
+  view.innerHTML=`${demoBanner()}${inspoHTML}
     ${on?"":`<div class="banner" style="border-style:solid"><span>Чтобы стилист заработал, добавь ключ API в настройках.</span><button class="btn sm primary" onclick="openSettings()">Настройки</button></div>`}
-    <div class="chat" id="chat">${S.chat.length?"":`<div class="msg ai">Опиши повод и погоду — соберу образы из твоих вещей. Могу найти, чего не хватает, или помочь носить забытое.</div>`}${S.chat.map(m=>m.role==="user"?`<div class="msg me">${esc(m.text)}</div>`:aiMsg(m)).join("")}${S.busy?`<div class="msg ai"><span class="spinner"></span></div>`:""}</div>
+    <div class="chat" id="chat">${S.chat.length?"":`<div class="msg ai">Опиши повод и погоду — соберу образы из твоих вещей. Могу найти, чего не хватает, или помочь носить забытое.</div>`}${S.chat.map(m=>m.role==="user"?`<div class="msg me">${m.img?`<img src="${esc(m.img)}" alt="" referrerpolicy="no-referrer">`:""}${esc(m.text)}</div>`:aiMsg(m)).join("")}${S.busy?`<div class="msg ai"><span class="spinner"></span></div>`:""}</div>
     ${S.chat.length?"":`<div class="chips" style="flex-wrap:wrap">${QUICK.map(q=>`<button class="chip" data-q="${esc(q)}" ${on?"":"disabled"}>${esc(q)}</button>`).join("")}</div>`}
     <div class="composer"><textarea id="ci" rows="1" placeholder="Например: конференция, +8°, весь день на ногах" aria-label="Сообщение стилисту" ${on?"":"disabled"}></textarea><button class="btn primary" id="cs" ${on&&!S.busy?"":"disabled"} aria-label="Отправить">↑</button></div>
     ${S.chat.length?`<button class="btn ghost sm" id="cclr" style="align-self:center">Начать заново</button>`:""}`;
@@ -886,6 +910,8 @@ function renderStylist(){
   view.querySelector("#cs").onclick=()=>ask(ci.value);
   view.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>ask(b.dataset.q));
   const cl=view.querySelector("#cclr");if(cl)cl.onclick=()=>{S.chat=[];lsSet("pr.chat",[]);render()};
+  view.querySelectorAll("[data-pin]").forEach(b=>b.onclick=()=>openPin(pins[+b.dataset.pin]));
+  const an=view.querySelector("#anStyle");if(an)an.onclick=analyzeStyle;
   view.querySelectorAll("[data-saveo]").forEach(b=>b.onclick=()=>{if(guardDemo())return;const [mi,oi]=b.dataset.saveo.split(":").map(Number);const so=S.chat[mi].outfits[oi];
     save("outfits",{id:uid(),name:so.title||"Образ от стилиста",itemIds:so.itemIds,layout:null,bg:BOARD_BG[1],tags:["стилист"],createdAt:Date.now()}).then(ok=>{if(ok){so.saved=true;lsSet("pr.chat",S.chat);toast("Образ сохранён");render()}})});
   view.querySelectorAll("[data-item]").forEach(b=>b.onclick=()=>openItem(b.dataset.item));
@@ -895,15 +921,34 @@ function aiMsg(m,mi){mi=S.chat.indexOf(m);
   (m.outfits||[]).forEach(o=>{o.itemIds=(o.itemIds||[]).filter(id=>itemById(id))});
   const cards=(m.outfits||[]).map((o,oi)=>o.itemIds.length?`<div class="ocard" style="padding:6px;background:var(--bg)">${boardHTML({itemIds:o.itemIds,bg:"var(--board)"},"mini")}<span class="nm">${esc(o.title||"")}</span>${o.why?`<span class="why">${esc(o.why)}</span>`:""}<button class="btn sm ${o.saved?"":"primary"}" data-saveo="${mi}:${oi}" ${o.saved?"disabled":""}>${o.saved?"Сохранено":"Сохранить"}</button></div>`:"").join("");
   return `<div class="msg ai">${esc(m.text)}${cards?`<div class="outs">${cards}</div>`:""}</div>`}
-async function ask(q){
+async function ask(q,extra={}){
   q=(q||"").trim();if(!q||S.busy)return;if(!sampleFn){openSettings();return}
-  S.chat.push({role:"user",text:q});S.busy=true;render();
+  S.chat.push({role:"user",text:q,img:extra.img||undefined});S.busy=true;render();
   const msgs=[];S.chat.forEach((m,i)=>{if(m.role==="user")msgs.push({role:"user",content:(i===0?SYS+"\n\n"+wardrobeContext()+"\n\nЗапрос: ":"")+m.text});else msgs.push({role:"assistant",content:JSON.stringify({reply:m.text,outfits:m.outfits||[]})})});
   if(S.chat.length>1){msgs[msgs.length-1].content=wardrobeContext()+"\n\nЗапрос: "+q+"\n(Ответ — только JSON в том же формате.)"}
-  try{const r=await sampleFn.json(msgs,{modelTier:"default"});
+  try{const r=await sampleFn.json(msgs,{modelTier:"default",cache:false,imageUrls:extra.imageUrls});
     S.chat.push({role:"ai",text:(r&&r.reply)||"Готово.",outfits:Array.isArray(r&&r.outfits)?r.outfits.slice(0,4):[]});}
   catch(e){S.chat.push({role:"ai",text:errText(e),outfits:[]})}
   S.busy=false;S.chat=S.chat.slice(-30);lsSet("pr.chat",S.chat);if(S.tab==="stylist")render();
+}
+
+function openPin(p){if(!p)return;
+  openSheet(`${hd("Пин")}<div class="preview" style="height:min(110vw,520px)"><img src="${esc(p.img)}" alt="" referrerpolicy="no-referrer"></div>
+    ${p.title?`<div class="muted" style="font-size:14px">${esc(p.title)}</div>`:""}
+    <div class="row"><button class="btn primary" id="pinLook" ${sampleFn&&sampleFn.urls?"":"disabled"}>Собрать похожее из моих вещей</button>${p.link?`<a class="btn" href="${esc(p.link)}" target="_blank" rel="noopener">Открыть в Pinterest</a>`:""}</div>
+    ${sampleFn&&sampleFn.urls?"":`<span class="muted" style="font-size:13px">Чтобы собирать образы по пинам, добавь ключ Anthropic в настройках.</span>`}`,sh=>{
+    const b=sh.querySelector("#pinLook");if(b)b.onclick=()=>{closeSheet();ask("Собери из моих вещей образ как на этой картинке. Если точного аналога нет — ближайший и скажи, какой вещи не хватает.",{imageUrls:[p.img],img:p.img.replace("/736x/","/236x/")})}});
+}
+async function analyzeStyle(){
+  if(!sampleFn||!sampleFn.urls||S.styleBusy||!S.inspo)return;
+  S.styleBusy=true;render();
+  const urls=S.inspo.slice(0,14).map(p=>p.img);
+  const items=V().items.map(i=>`${i.name} (${CAT[i.cat]}, ${(i.colors||[]).join("/")})`).join("; ");
+  try{const r=await sampleFn.json(`Это картинки с её доски вдохновения в Pinterest. Определи её стиль в одежде по ним. Учитывай только одежду, обувь и аксессуары; картинки не про одежду пропусти. Сравни с её гардеробом: ${items||"пока пуст"}.
+Верни ТОЛЬКО JSON по-русски: {"summary":"2–3 предложения о стиле, конкретно, без комплиментов","palette":[{"name":"цвет","hex":"#RRGGBB"}],"silhouettes":["3–5 коротких описаний"],"missing":[{"name":"вещь","why":"зачем она для этого стиля, 1 короткая фраза"}]}. palette — 4–6 цветов, missing — 3–5 вещей, которых нет в гардеробе.`,{modelTier:"default",imageUrls:urls});
+    if(r&&r.summary){S.style=r;lsSet("pr.style",r);toast("Стиль разобран")}}
+  catch(e){toast(typeof errText==="function"?errText(e):"Не получилось разобрать стиль")}
+  S.styleBusy=false;if(S.tab==="stylist")render();
 }
 
 boot();
