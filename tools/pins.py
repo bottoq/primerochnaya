@@ -16,7 +16,7 @@ def resolve(link):
         # pin.it sometimes answers with an HTML page that carries the target
         m = re.search(rb'https://[a-z.]*pinterest\.[a-z.]+/[^"\'<> ]+', body)
         if m: final = m.group(0).decode()
-    return final
+    return final.split("?")[0]
 
 def feeds_for(url):
     p = urlparse(url)
@@ -46,12 +46,62 @@ def parse(xml_bytes):
         pins.append({"id": pid.group(1) if pid else img, "img": img, "title": title, "link": link})
     return pins
 
+def board_api(user, board, errors):
+    """Pinterest's own web endpoints for a public board: all pins, paged."""
+    import json as J
+    from urllib.parse import quote
+    def res(name, options, source):
+        u = f"https://www.pinterest.com/resource/{name}/get/?source_url={quote(source)}&data={quote(J.dumps({'options': options, 'context': {}}))}"
+        req = urllib.request.Request(u, headers={**UA, "Accept": "application/json", "X-Requested-With": "XMLHttpRequest", "X-Pinterest-AppState": "active"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return J.loads(r.read())["resource_response"]
+    src = f"/{user}/{board}/"
+    try:
+        b = res("BoardResource", {"username": user, "slug": board, "field_set_key": "detailed"}, src)["data"]
+    except Exception as e:
+        errors.append(f"BoardResource: {e}"); return [], None
+    bid, total = b.get("id"), b.get("pin_count")
+    pins, bookmark = [], None
+    for _ in range(20):
+        opts = {"board_id": bid, "board_url": src, "page_size": 100, "field_set_key": "react_grid_pin"}
+        if bookmark: opts["bookmarks"] = [bookmark]
+        try:
+            r = res("BoardFeedResource", opts, src)
+        except Exception as e:
+            errors.append(f"BoardFeedResource: {e}"); break
+        for it in r.get("data") or []:
+            if it.get("type") != "pin": continue
+            imgs = it.get("images") or {}
+            im = imgs.get("736x") or imgs.get("564x") or imgs.get("orig") or {}
+            if not im.get("url"): continue
+            pins.append({"id": str(it.get("id")), "img": im["url"], "title": (it.get("grid_title") or it.get("title") or "").strip(), "link": f"https://www.pinterest.com/pin/{it.get('id')}/"})
+        bookmark = r.get("bookmark")
+        if not bookmark or bookmark == "-end-": break
+    return pins, total
+
+def widget_api(user, board, errors):
+    try:
+        _, body = get(f"https://widgets.pinterest.com/v3/pidgets/boards/{user}/{board}/pins/")
+        data = json.loads(body)["data"]["pins"]
+        out = []
+        for it in data:
+            im = (it.get("images") or {}).get("564x") or (it.get("images") or {}).get("237x") or {}
+            if im.get("url"): out.append({"id": str(it.get("id")), "img": re.sub(r"/\d+x/", "/736x/", im["url"]), "title": (it.get("description") or "").strip()[:120], "link": f"https://www.pinterest.com/pin/{it.get('id')}/"})
+        return out
+    except Exception as e:
+        errors.append(f"widgets: {e}"); return []
+
 def main():
     src = open("pins-source.txt").read().strip().splitlines()[0].strip()
     url = resolve(src)
     user, feeds = feeds_for(url)
-    pins, used, errors = [], None, []
-    for f in feeds:
+    pins, used, errors, total = [], None, [], None
+    parts = [x for x in urlparse(url).path.split("/") if x]
+    if len(parts) >= 2:
+        pins, total = board_api(parts[0], parts[1], errors); used = "board-api" if pins else None
+        if not pins:
+            pins = widget_api(parts[0], parts[1], errors); used = "widgets" if pins else None
+    for f in ([] if pins else feeds):
         try:
             _, body = get(f)
             got = parse(body)
@@ -61,7 +111,7 @@ def main():
             errors.append(f + ": пустая лента")
         except Exception as e:
             errors.append(f"{f}: {e}")
-    out = {"source": src, "resolved": url, "feed": used, "user": user, "count": len(pins), "pins": pins[:60], "errors": errors}
+    out = {"source": src, "resolved": url, "feed": used, "user": user, "count": len(pins), "board_total": total, "pins": pins[:400], "errors": errors}
     json.dump(out, open("inspo.json", "w"), ensure_ascii=False, indent=1)
     print(json.dumps({k: v for k, v in out.items() if k != "pins"}, ensure_ascii=False, indent=1))
 
