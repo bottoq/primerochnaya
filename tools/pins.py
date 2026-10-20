@@ -46,43 +46,47 @@ def parse(xml_bytes):
         pins.append({"id": pid.group(1) if pid else img, "img": img, "title": title, "link": link})
     return pins
 
-def board_api(user, board, errors):
-    """Pinterest's own web endpoints for a public board: all pins, paged."""
-    import json as J
+def board_api(user, board, errors, board_id=None):
+    """All pins of a public board via Pinterest's web endpoint (cookie + csrf like a browser)."""
+    import json as J, http.cookiejar
     from urllib.parse import quote
-    def res(name, options, source):
-        u = f"https://www.pinterest.com/resource/{name}/get/?source_url={quote(source)}&data={quote(J.dumps({'options': options, 'context': {}}))}"
-        req = urllib.request.Request(u, headers={**UA, "Accept": "application/json", "X-Requested-With": "XMLHttpRequest", "X-Pinterest-AppState": "active"})
-        with urllib.request.urlopen(req, timeout=30) as r:
-            return J.loads(r.read())["resource_response"]
+    jar = http.cookiejar.CookieJar()
+    op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
     src = f"/{user}/{board}/"
     try:
-        b = res("BoardResource", {"username": user, "slug": board, "field_set_key": "detailed"}, src)["data"]
+        html = op.open(urllib.request.Request("https://www.pinterest.com" + src, headers=UA), timeout=30).read().decode("utf8", "ignore")
     except Exception as e:
-        errors.append(f"BoardResource: {e}"); return [], None
-    bid, total = b.get("id"), b.get("pin_count")
+        errors.append(f"board page: {e}"); return [], None
+    if not board_id:
+        m = re.search(r'"board_id"\s*:\s*"?(\d+)', html) or re.search(r'"id"\s*:\s*"(\d{10,})"\s*,\s*"[^"]*"\s*:\s*[^,]*,\s*"url"\s*:\s*"/' + re.escape(user), html)
+        board_id = m and m.group(1)
+    if not board_id:
+        errors.append("board id not found"); return [], None
+    csrf = next((c.value for c in jar if c.name == "csrftoken"), "")
     pins, bookmark = [], None
-    for _ in range(20):
-        opts = {"board_id": bid, "board_url": src, "page_size": 100, "field_set_key": "react_grid_pin"}
+    for _ in range(30):
+        opts = {"board_id": board_id, "board_url": src, "page_size": 100, "field_set_key": "react_grid_pin"}
         if bookmark: opts["bookmarks"] = [bookmark]
+        u = f"https://www.pinterest.com/resource/BoardFeedResource/get/?source_url={quote(src)}&data={quote(J.dumps({'options': opts, 'context': {}}))}"
+        h = {**UA, "Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest", "X-Pinterest-AppState": "active", "X-CSRFToken": csrf, "Referer": "https://www.pinterest.com" + src, "X-Pinterest-Source-Url": src}
         try:
-            r = res("BoardFeedResource", opts, src)
+            r = J.loads(op.open(urllib.request.Request(u, headers=h), timeout=30).read())["resource_response"]
         except Exception as e:
             errors.append(f"BoardFeedResource: {e}"); break
         for it in r.get("data") or []:
-            if it.get("type") != "pin": continue
+            if not isinstance(it, dict) or it.get("type") != "pin": continue
             imgs = it.get("images") or {}
             im = imgs.get("736x") or imgs.get("564x") or imgs.get("orig") or {}
-            if not im.get("url"): continue
-            pins.append({"id": str(it.get("id")), "img": im["url"], "title": (it.get("grid_title") or it.get("title") or "").strip(), "link": f"https://www.pinterest.com/pin/{it.get('id')}/"})
+            if im.get("url"):
+                pins.append({"id": str(it.get("id")), "img": im["url"], "title": (it.get("grid_title") or it.get("title") or "").strip(), "link": f"https://www.pinterest.com/pin/{it.get('id')}/"})
         bookmark = r.get("bookmark")
         if not bookmark or bookmark == "-end-": break
-    return pins, total
+    return pins, None
 
 def widget_api(user, board, errors):
     try:
         _, body = get(f"https://widgets.pinterest.com/v3/pidgets/boards/{user}/{board}/pins/")
-        data = json.loads(body)["data"]["pins"]
+        d = json.loads(body)["data"]; data = d["pins"]; widget_api.board_id = str((d.get("board") or {}).get("id") or "")
         out = []
         for it in data:
             im = (it.get("images") or {}).get("564x") or (it.get("images") or {}).get("237x") or {}
@@ -98,9 +102,12 @@ def main():
     pins, used, errors, total = [], None, [], None
     parts = [x for x in urlparse(url).path.split("/") if x]
     if len(parts) >= 2:
-        pins, total = board_api(parts[0], parts[1], errors); used = "board-api" if pins else None
-        if not pins:
-            pins = widget_api(parts[0], parts[1], errors); used = "widgets" if pins else None
+        wp = widget_api(parts[0], parts[1], errors)
+        full, total = board_api(parts[0], parts[1], errors, getattr(widget_api, "board_id", None))
+        seen, pins = set(), []
+        for p in full + wp:
+            if p["id"] not in seen: seen.add(p["id"]); pins.append(p)
+        used = "board-api" if full else ("widgets" if wp else None)
     for f in ([] if pins else feeds):
         try:
             _, body = get(f)
