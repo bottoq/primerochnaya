@@ -376,7 +376,7 @@ async function studioGen(srcCanvas,cat){
     if(r.status===429)throw new Error(/billing|quota/i.test(m)?"Лимит Google исчерпан — для генерации картинок может понадобиться включить оплату в Google AI Studio.":"Слишком много запросов подряд. Попробуй через минуту.");
     throw new Error("Google вернул ошибку"+(m?": "+m.slice(0,140):"."))}
   const parts=(j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[];
-  const img=parts.find(p=>p.inlineData||p.inline_data);
+  const img=parts.filter(p=>(p.inlineData||p.inline_data)&&!p.thought).pop();
   if(!img)throw new Error("ИИ не вернул картинку"+(j.candidates&&j.candidates[0]&&j.candidates[0].finishReason?" ("+j.candidates[0].finishReason+")":"")+". Попробуй ещё раз.");
   const d=img.inlineData||img.inline_data;const el=new Image();el.src=`data:${d.mimeType||d.mime_type||"image/png"};base64,${d.data}`;await el.decode();
   const out=document.createElement("canvas");const kk=Math.min(1,1000/Math.max(el.naturalWidth,el.naturalHeight));out.width=Math.round(el.naturalWidth*kk);out.height=Math.round(el.naturalHeight*kk);
