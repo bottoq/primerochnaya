@@ -424,10 +424,13 @@ function openSettings(){
     const res=sh.querySelector("#kRes");
     const gm=()=>sh.querySelectorAll("#gmod button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===lsGet("pr.gmodel","gemini-2.5-flash-image")));gm();
     sh.querySelector("#gmod").onclick=e=>{const b=e.target.closest("button");if(b){lsSet("pr.gmodel",b.dataset.v);gm()}};
-    sh.querySelector("#gSave").onclick=()=>{lsSet("pr.gkey",sh.querySelector("#gkey").value.trim());refreshStudio();sh.querySelector("#gRes").textContent=studioFn?"Ключ сохранён. При добавлении вещи появится режим «Студия ИИ».":"Ключ удалён."};
+    sh.querySelector("#gSave").onclick=()=>{const gv=sh.querySelector("#gkey").value.trim();if(gv&&/^sk-ant/.test(gv)){sh.querySelector("#gRes").textContent="Это ключ Anthropic — он для стилиста, вставь его в поле выше. Здесь нужен ключ Google (AIza…).";return}lsSet("pr.gkey",gv);refreshStudio();sh.querySelector("#gRes").textContent=studioFn?"Ключ сохранён. При добавлении вещи появится режим «Студия ИИ».":"Ключ удалён."};
     const gd=sh.querySelector("#gDel");if(gd)gd.onclick=()=>{lsSet("pr.gkey","");refreshStudio();closeSheet();toast("Ключ Google удалён")};
-    sh.querySelector("#kSave").onclick=()=>{lsSet("pr.key",sh.querySelector("#key").value.trim());refreshAI();res.textContent="Ключ сохранён.";render()};
-    sh.querySelector("#kTest").onclick=async()=>{lsSet("pr.key",sh.querySelector("#key").value.trim());refreshAI();res.innerHTML=`<span class="spinner"></span> Проверяю…`;
+    const isG=v=>/^AIza/.test(v);
+    sh.querySelector("#kSave").onclick=()=>{const v=sh.querySelector("#key").value.trim();
+      if(isG(v)){lsSet("pr.gkey",v);lsSet("pr.key","");refreshStudio();refreshAI();sh.querySelector("#key").value="";sh.querySelector("#gkey").value=v;res.textContent="Это ключ Google — перенесла его в «Студийные фото вещей». Здесь нужен ключ Anthropic (sk-ant-…).";render();return}
+      lsSet("pr.key",v);refreshAI();res.textContent="Ключ сохранён.";render()};
+    sh.querySelector("#kTest").onclick=async()=>{if(isG(sh.querySelector("#key").value.trim())){sh.querySelector("#kSave").click();return}lsSet("pr.key",sh.querySelector("#key").value.trim());refreshAI();res.innerHTML=`<span class="spinner"></span> Проверяю…`;
       try{await callClaude('Ответь только JSON {"ok":true}',{modelTier:"quick"});res.innerHTML=`<span style="color:var(--good)">Работает.</span>`}catch(e){res.textContent=errText(e)}};
     const kd=sh.querySelector("#kDel");if(kd)kd.onclick=()=>{lsSet("pr.key","");refreshAI();closeSheet();toast("Ключ удалён");render()};
     sh.querySelector("#bExp").onclick=async()=>{const data={app:"primerochnaya",v:1,at:new Date().toISOString(),items:S.items,outfits:S.outfits,plans:S.plans,trips:S.trips};
