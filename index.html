@@ -400,7 +400,7 @@ async function studioGen(srcCanvas,cat,retried){
     if(r.status===400&&/API key/i.test(m))throw new Error("Ключ Google не подходит — проверь его в настройках.");
     if(r.status===403)throw new Error("Ключ Google не подходит или у проекта нет доступа к этой модели.");
     if(r.status===404||(r.status===400&&/model|imageConfig|modalit/i.test(m))){if(!retried){lsSet("pr.gbad",[...new Set([...lsGet("pr.gbad",[]),model])]);const rest=lsGet("pr.gmodels",[]).filter(x=>x!==model);lsSet("pr.gmodels",rest);if(rest.length){lsSet("pr.gmodel",rest[0]);return studioGen(srcCanvas,cat,true)}}throw new Error("Модель "+model+" не подошла: "+m.slice(0,140))}
-    if(r.status===429)throw new Error(/billing|quota/i.test(m)?"Лимит Google исчерпан — для генерации картинок может понадобиться включить оплату в Google AI Studio.":"Слишком много запросов подряд. Попробуй через минуту.");
+    if(r.status===429)throw new Error((/billing|quota/i.test(m)?"Лимит Google исчерпан — для генерации картинок может понадобиться включить оплату в Google AI Studio.":"Слишком много запросов подряд. Попробуй через минуту.")+(m?" Ответ Google: "+m.slice(0,160):""));
     throw new Error("Google вернул ошибку"+(m?": "+m.slice(0,140):"."))}
   const parts=(j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[];
   const img=parts.filter(p=>(p.inlineData||p.inline_data)&&!p.thought).pop();
@@ -447,7 +447,7 @@ function openSettings(){
       <span class="muted" style="font-size:14px">Всё хранится на телефоне. Раз в пару недель сохраняй копию в «Файлы» или iCloud — тогда гардероб не пропадёт при смене телефона.</span>
       <div class="row"><button class="btn sm" id="bExp">Сохранить копию</button><label class="btn sm" for="bImp">Восстановить из копии</label><input type="file" id="bImp" accept=".json,application/json" hidden></div>
       <span id="bRes" class="muted" style="font-size:13px"></span></div>
-    <div class="field"><span class="label">О приложении</span><span class="muted" style="font-size:14px">${S.items.length} ${plural(S.items.length,"вещь","вещи","вещей")}, ${S.outfits.length} ${plural(S.outfits.length,"образ","образа","образов")}. Работает без интернета, кроме стилиста и распознавания. Версия 8.</span></div>`,sh=>{
+    <div class="field"><span class="label">О приложении</span><span class="muted" style="font-size:14px">${S.items.length} ${plural(S.items.length,"вещь","вещи","вещей")}, ${S.outfits.length} ${plural(S.outfits.length,"образ","образа","образов")}. Работает без интернета, кроме стилиста и распознавания. Версия 9.</span></div>`,sh=>{
     const res=sh.querySelector("#kRes");
     const gsel=sh.querySelector("#gmod"),fillM=()=>{const l=lsGet("pr.gmodels",[]),cur=lsGet("pr.gmodel","");gsel.innerHTML=l.length?l.map(m=>`<option value="${esc(m)}" ${m===cur?"selected":""}>${esc(m)}</option>`).join(""):`<option value="">Модель подберётся после проверки ключа</option>`;gsel.disabled=!l.length};fillM();
     gsel.onchange=()=>lsSet("pr.gmodel",gsel.value);
@@ -580,14 +580,19 @@ async function nextAdd(total){
     const show=c=>{st.res=c;pv.innerHTML="";pv.appendChild(c);if(!st.colors.length){st.colors=detectColors(c);syncUI()}};
     const gen=async()=>{st.busy=true;okB.disabled=true;sh.querySelector("#again").disabled=true;
       pv.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--muted);font-size:14px"><span class="spinner"></span>Снимаю студийное фото…</div>`;hint.textContent="Обычно 5–15 секунд.";
-      try{st.studio=await studioFn(src,st.cat);if(st.mode==="studio")redo()}
-      catch(e){hint.textContent=(e&&e.message)||"Не получилось сгенерировать.";if(st.mode==="studio"){st.mode="cut";redo()}}
+      try{st.studio=await studioFn(src,st.cat);st.err=null}
+      catch(e){st.err=(e&&e.message)||"Не получилось сгенерировать.";try{lsSet("pr.lastStudioError",st.err)}catch{}}
+      st.busy=false;okB.disabled=false;sh.querySelector("#again").disabled=false;if(st.mode==="studio")redo();return;
       st.busy=false;okB.disabled=false;sh.querySelector("#again").disabled=false};
     const redo=()=>{
       sh.querySelectorAll("#modeS button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===st.mode));
       sh.querySelector("#cutBox").hidden=st.mode!=="cut";sh.querySelector("#studioBox").hidden=st.mode!=="studio";
+      okB.disabled=st.busy;
       if(st.mode==="orig"){show(src);hint.textContent="";return}
-      if(st.mode==="studio"){if(!st.studio){if(!st.busy)gen();return}const r=cutout(st.studio,30);show(r.canvas);hint.textContent="Сгенерировано ИИ по твоему фото. Проверь цвет и детали — если что-то не так, нажми «Ещё вариант».";return}
+      if(st.mode==="studio"){
+        if(st.err&&!st.studio){pv.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px;text-align:center"><b>Студия не сработала</b><span style="color:var(--warn);font-size:14px;overflow-wrap:anywhere">${esc(st.err)}</span><div class="row" style="justify-content:center"><button class="btn sm primary" id="retryS">Попробовать снова</button><button class="btn sm" id="toCut">Вырезать фон</button></div></div>`;
+          hint.textContent="";okB.disabled=true;pv.querySelector("#retryS").onclick=()=>{st.err=null;gen()};pv.querySelector("#toCut").onclick=()=>{st.mode="cut";okB.disabled=false;redo()};return}
+        if(!st.studio){if(!st.busy)gen();return}const r=cutout(st.studio,30);show(r.canvas);hint.textContent="Сгенерировано ИИ по твоему фото. Проверь цвет и детали — если что-то не так, нажми «Ещё вариант».";return}
       const r=cutout(src,st.strength);show(r.canvas);
       hint.textContent=r.ok?"Лучше всего работает, если вещь снята на ровном фоне: стена, кровать, пол.":"Фон не распознался: оставила фото целиком. Сдвинь ползунок или сними вещь на однотонном фоне.";};
     redo();syncUI();
