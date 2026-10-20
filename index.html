@@ -487,7 +487,7 @@ function openSettings(){
       <span class="muted" style="font-size:14px">Всё хранится на телефоне. Раз в пару недель сохраняй копию в «Файлы» или iCloud — тогда гардероб не пропадёт при смене телефона.</span>
       <div class="row"><button class="btn sm" id="bExp">Сохранить копию</button><label class="btn sm" for="bImp">Восстановить из копии</label><input type="file" id="bImp" accept=".json,application/json" hidden></div>
       <span id="bRes" class="muted" style="font-size:13px"></span></div>
-    <div class="field"><span class="label">О приложении</span><span class="muted" style="font-size:14px">${S.items.length} ${plural(S.items.length,"вещь","вещи","вещей")}, ${S.outfits.length} ${plural(S.outfits.length,"образ","образа","образов")}. Работает без интернета, кроме стилиста и распознавания. Версия 12.</span></div>`,sh=>{
+    <div class="field"><span class="label">О приложении</span><span class="muted" style="font-size:14px">${S.items.length} ${plural(S.items.length,"вещь","вещи","вещей")}, ${S.outfits.length} ${plural(S.outfits.length,"образ","образа","образов")}. Работает без интернета, кроме стилиста и распознавания. Версия 13.</span></div>`,sh=>{
     const res=sh.querySelector("#kRes");
     const psel=sh.querySelector("#pmod"),fillP=()=>{const l=lsGet("pr.pmodels",[]),cur=lsGet("pr.pmodel","");psel.innerHTML=l.length?l.map(m=>`<option value="${esc(m)}" ${m===cur?"selected":""}>${esc(m)}</option>`).join(""):`<option value="">Модель подберётся после проверки</option>`;psel.disabled=!l.length};fillP();
     psel.onchange=()=>lsSet("pr.pmodel",psel.value);
@@ -620,7 +620,7 @@ $("#fileIn").onchange=e=>{addQueue=[...e.target.files];e.target.value="";if(addQ
 async function nextAdd(total){
   const f=addQueue.shift();if(!f)return;const n=total-addQueue.length;
   let src;try{src=await fileToCanvas(f)}catch{toast("Не удалось открыть фото");return nextAdd(total)}
-  const hasCut=alphaShare(src)>.05;const st={strength:45,mode:hasCut?"orig":studioFn?"studio":"cut",ml:null,mlErr:null,studio:null,busy:false,res:null,name:"",cat:"top",colors:[],seasons:[],brand:"",price:"",ai:false};
+  const hasCut=alphaShare(src)>.05;const st={strength:45,mode:hasCut?"orig":"cut",ml:null,mlErr:null,studio:null,busy:false,res:null,name:"",cat:"top",colors:[],seasons:[],brand:"",price:"",ai:false};
   openSheet(`${hd(total>1?`Новая вещь · ${n} из ${total}`:"Новая вещь")}
     <div class="preview" id="pv"></div>
     <div class="seg" id="modeS">${studioFn?`<button data-m="studio">Студия ИИ</button>`:""}<button data-m="cut">Вырезать фон</button><button data-m="orig">Как есть</button></div>
