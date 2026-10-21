@@ -18,7 +18,7 @@
 /* Layout: one-column phone app, berry ink on blush paper; bottom tab bar; full-screen timer overlay */
 :root{
   --bg:#F8E8ED; --surface:#FFF6F8; --surface-2:#F1D6DF; --ink:#3A1426; --muted:#86566A;
-  --line:#EAC6D2; --accent:#C42D67; --accent-ink:#FFF4F7; --soft:#F4B3C8; --rest:#7E5BA8; --fig-far:#CFA5B6; --fig-bg:#FFF6F8; --fig-glow:#FFFFFF; --fig-shadow:#E9BFCD;
+  --line:#EAC6D2; --accent:#C42D67; --accent-ink:#FFF4F7; --soft:#F4B3C8; --rest:#7E5BA8; --fig-far:#CFA5B6; --fig-bg:#FFF6F8; --fig-glow:#FFFFFF; --fig-shadow:#E9BFCD; --rest-bg:#F2E8F7;
   --display:'Cormorant',Georgia,'Times New Roman',serif;
   --body:'Golos Text',system-ui,-apple-system,'Segoe UI',sans-serif;
   --num:'Unbounded','Golos Text',system-ui,sans-serif;
@@ -26,10 +26,10 @@
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#1B0C13; --surface:#27121C; --surface-2:#371A27; --ink:#FBE3EB; --muted:#C397A9;
-  --line:#4A2536; --accent:#FF6C9C; --accent-ink:#2A0915; --soft:#7B2C4B; --rest:#B597E0; --fig-far:#6F4357; --fig-bg:#27121C; --fig-glow:#45202F; --fig-shadow:#12070C; color-scheme:dark}}
+  --line:#4A2536; --accent:#FF6C9C; --accent-ink:#2A0915; --soft:#7B2C4B; --rest:#B597E0; --fig-far:#6F4357; --fig-bg:#27121C; --fig-glow:#45202F; --fig-shadow:#12070C; --rest-bg:#1E1426; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#1B0C13; --surface:#27121C; --surface-2:#371A27; --ink:#FBE3EB; --muted:#C397A9;
-  --line:#4A2536; --accent:#FF6C9C; --accent-ink:#2A0915; --soft:#7B2C4B; --rest:#B597E0; --fig-far:#6F4357; --fig-bg:#27121C; --fig-glow:#45202F; --fig-shadow:#12070C; color-scheme:dark}
+  --line:#4A2536; --accent:#FF6C9C; --accent-ink:#2A0915; --soft:#7B2C4B; --rest:#B597E0; --fig-far:#6F4357; --fig-bg:#27121C; --fig-glow:#45202F; --fig-shadow:#12070C; --rest-bg:#1E1426; color-scheme:dark}
 
 *{box-sizing:border-box}
 html,body{background:var(--bg)}
@@ -105,6 +105,7 @@ details.ex summary::-webkit-details-marker{display:none}
 .ex ol{margin:8px 0 0;padding-left:20px;font-size:14px}
 .ex li{padding:3px 0}
 .ex li span{color:var(--muted);font-variant-numeric:tabular-nums}
+.ex-h{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-top:12px}
 .prog-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
 
 details.backup{margin-top:30px;border-top:1px solid var(--line);padding-top:14px}
@@ -146,7 +147,7 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
 .player[data-kind="rest"]{--accent:var(--rest)}
 .pl-top{display:flex;justify-content:space-between;align-items:center;gap:10px;max-width:520px;width:100%;margin:0 auto}
 .pl-name{font-size:13px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bar{height:3px;background:var(--line);border-radius:3px;margin:12px auto 0;max-width:520px;width:100%;overflow:hidden}
+.bar{height:5px;background:var(--line);border-radius:3px;margin:12px auto 0;max-width:520px;width:100%;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--accent);width:0}
 .pl-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;max-width:520px;width:100%;margin:0 auto;min-height:0}
 .phase{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600}
@@ -160,8 +161,20 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
 .next{font-size:14px;color:var(--muted)}
 .next strong{color:var(--ink);font-weight:600}
 .pl-ctrl{display:flex;justify-content:center;gap:14px;align-items:center}
-.cbtn{width:56px;height:56px;border-radius:50%;border:0;background:var(--surface);color:var(--ink);font-size:18px;display:grid;place-items:center}
-.cbtn.main{width:76px;height:76px;background:var(--accent);color:var(--accent-ink);font-size:24px}
+.cbtn{width:60px;height:60px;border-radius:50%;border:0;background:var(--surface);color:var(--ink);display:grid;place-items:center;padding:0;box-shadow:inset 0 0 0 1.5px var(--line),0 8px 18px -12px rgba(120,20,70,.45);transition:transform .12s ease,background .2s}
+.cbtn svg{width:24px;height:24px;display:block}
+.cbtn:active{transform:scale(.9)}
+.cbtn.main{width:82px;height:82px;background:var(--accent);color:var(--accent-ink);box-shadow:0 0 0 8px color-mix(in srgb,var(--accent) 15%,transparent),0 14px 26px -12px var(--accent)}
+.cbtn.main svg{width:32px;height:32px}
+.pl-title{display:flex;flex-direction:column;min-width:0;gap:1px}
+.pl-count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pl-name{color:var(--ink)!important;font-weight:600}
+.pl-close{border:0;background:var(--surface);color:var(--ink);font-weight:600;font-size:14px;padding:9px 16px;border-radius:999px;box-shadow:inset 0 0 0 1.5px var(--line)}
+.pill{border:0;background:var(--surface);color:var(--accent);font-weight:600;font-size:14px;padding:9px 16px;border-radius:999px;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--accent) 35%,transparent)}
+.phase{display:inline-block;padding:5px 12px;border-radius:999px;background:color-mix(in srgb,var(--accent) 13%,transparent)}
+.player{transition:background .35s}
+.player[data-kind="rest"]{background:var(--rest-bg)}
+.player[data-kind="rest"] .ring .track,.player[data-kind="prep"] .ring .track{stroke:color-mix(in srgb,var(--accent) 16%,var(--surface))}
 .done{max-width:420px;width:100%;margin:auto;text-align:center}
 .done .big{font-family:var(--display);font-style:italic;font-weight:600;font-size:56px;line-height:1;margin:0}
 .done .sum{font-family:var(--num);font-size:15px;color:var(--muted);margin:10px 0 20px}
@@ -185,7 +198,7 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
 .sheet ol,.sheet ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;max-width:60ch}
 .sheet ul li::marker{color:var(--accent)}
 .t-p{margin:14px 0 0}
-.pl-fig{border:0;padding:0;width:min(38vw,150px);position:relative;flex:none}
+.pl-fig{border:0;padding:0;width:min(44vw,176px);position:relative;flex:none;box-shadow:0 10px 24px -14px rgba(160,30,80,.55)}
 .live{position:absolute;left:50%;bottom:10px;box-shadow:0 2px 8px rgba(120,20,70,.15);transform:translateX(-50%);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:3px 11px;border-radius:999px;background:var(--bg);color:var(--muted);transition:color .2s,background .2s}
 .live.ex{color:#12343A;background:#9FE6EA}
 .pl-fig span{position:absolute;right:6px;bottom:6px;font-size:11px;font-weight:600;color:#7A1E4B;background:rgba(255,255,255,.75);padding:2px 8px;border-radius:999px}
@@ -307,7 +320,7 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
 
 <!-- player -->
 <div class="player" id="player" hidden>
-  <div class="pl-top"><span class="pl-name" id="plProg"></span><button class="btn ghost small" id="plClose">Завершить</button></div>
+  <div class="pl-top"><div class="pl-title"><span class="pl-name" id="plProg"></span><span class="pl-count" id="plCount"></span></div><button class="pl-close" id="plClose">Завершить</button></div>
   <div class="bar"><i id="plBar"></i></div>
   <div class="pl-main" id="plMain">
     <div class="phase" id="plPhase"></div>
@@ -316,11 +329,12 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
     <button class="fig pl-fig" id="plFig" hidden aria-label="Открыть технику"></button>
     <div class="ring"><svg viewBox="0 0 260 260"><circle class="track" cx="130" cy="130" r="120"/><circle class="prog-arc" id="plArc" cx="130" cy="130" r="120" stroke-dasharray="753.98" stroke-dashoffset="0"/></svg><b id="plTime">0</b></div>
     <div class="next" id="plNext"></div>
+    <button class="pill" id="plAdd" hidden>+15 секунд отдыха</button>
   </div>
   <div class="pl-ctrl" id="plCtrl">
-    <button class="cbtn" id="plPrev" aria-label="Назад">⏮</button>
-    <button class="cbtn main" id="plPlay" aria-label="Пауза">❚❚</button>
-    <button class="cbtn" id="plSkip" aria-label="Пропустить">⏭</button>
+    <button class="cbtn" id="plPrev" aria-label="Предыдущее упражнение"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="5.5" width="2.8" height="13" rx="1.4" fill="currentColor"/><path d="M19.5 6.9v10.2c0 .9-1 1.4-1.7.9l-7.6-5.1a1.1 1.1 0 0 1 0-1.8l7.6-5.1c.7-.5 1.7 0 1.7.9z" fill="currentColor"/></svg></button>
+    <button class="cbtn main" id="plPlay" aria-label="Пауза"></button>
+    <button class="cbtn" id="plSkip" aria-label="Следующее упражнение"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="16.7" y="5.5" width="2.8" height="13" rx="1.4" fill="currentColor"/><path d="M4.5 6.9v10.2c0 .9 1 1.4 1.7.9l7.6-5.1a1.1 1.1 0 0 0 0-1.8L6.2 6c-.7-.5-1.7 0-1.7.9z" fill="currentColor"/></svg></button>
   </div>
   <div class="done" id="plDone" hidden>
     <p class="big">Готово</p>
@@ -795,42 +809,80 @@ const PRESETS=[
   {n:'Скрутка лёжа — влево',cue:'Плечи на полу, колени уходят в сторону.',w:60,r:5},
   {n:'Поза ребёнка',cue:'Руки вперёд или вдоль тела, дышим в спину.',w:60,r:5},
   {n:'Шавасана',cue:'Лёжа на спине, полностью расслабься. Таймер подаст сигнал.',w:360,r:0}]},
- {id:'p-kb',name:'Гиря: всё тело',type:'weights',rounds:3,roundRest:60,desc:'Мягкая гиря, три круга. Ягодицы, спина, руки и корпус.',items:[
+ {id:'p-kb',name:'Гиря: всё тело',type:'weights',rounds:3,roundRest:75,desc:'Мягкая гиря, три круга. Ягодицы, спина, руки и корпус. С разминкой и заминкой.',
+  warm:[
+  {n:'Марш на месте',cue:'Высоко колени, руки работают. Разогреваемся.',w:40,r:5},
+  {n:'Круги тазом',cue:'Руки на поясе, большие медленные круги в обе стороны.',w:30,r:5},
+  {n:'Наклоны с прямой спиной',cue:'Без веса. Таз назад, спина ровная — это подготовка к махам.',w:40,r:5},
+  {n:'Присед без веса',cue:'Медленно, колени по линии носков.',w:40,r:5},
+  {n:'Ягодичный мост без веса',cue:'Лёжа, поднимай таз и сжимай ягодицы наверху.',w:30,r:15}],
+  items:[
   {n:'Махи гирей',cue:'Толчок тазом, руки только направляют. Спина ровная.',w:40,r:20},
   {n:'Гоблет-присед',cue:'Гиря у груди, колени по линии носков, пауза внизу.',w:40,r:20},
-  {n:'Тяга в наклоне',cue:'По 20 секунд на руку. Локоть ведёт назад к бедру.',w:40,r:20},
+  {n:'Тяга в наклоне — правая рука',cue:'Опора левой рукой о бедро. Локоть ведёт назад к бедру.',w:30,r:5},
+  {n:'Тяга в наклоне — левая рука',cue:'Опора правой рукой о бедро. Локоть ведёт назад к бедру.',w:30,r:20},
   {n:'Ягодичный мост с гирей',cue:'Гиря на тазе, наверху сжать ягодицы на секунду.',w:40,r:20},
-  {n:'Русский твист',cue:'Сидя, стопы можно на полу. Поворот грудью, не руками.',w:30,r:20}]},
- {id:'p-rope',name:'Скакалка: интервалы',type:'rope',rounds:6,roundRest:30,desc:'Шесть раундов. Считай прыжки и записывай рекорд.',items:[
+  {n:'Русский твист',cue:'Сидя, стопы можно на полу. Поворот грудью, не руками.',w:30,r:20}],
+  cool:[
+  {n:'Наклон к ногам сидя',cue:'Тянешься животом к бёдрам, дышим спокойно.',w:60,r:5},
+  {n:'Голубь — правая нога',cue:'Таз ровно, можно лечь грудью на пол.',w:40,r:5},
+  {n:'Голубь — левая нога',cue:'Таз ровно, можно лечь грудью на пол.',w:40,r:5},
+  {n:'Поза ребёнка',cue:'Руки вперёд, дышим в спину.',w:45,r:0}]},
+ {id:'p-rope',name:'Скакалка: интервалы',type:'rope',rounds:6,roundRest:30,desc:'Шесть раундов по полторы минуты. Считай прыжки и записывай рекорд.',
+  warm:[
+  {n:'Подъёмы на носки',cue:'Медленно вверх, медленно вниз. Готовим икры и ахиллы.',w:40,r:5},
+  {n:'Круги стопами',cue:'По 15 секунд на каждую стопу.',w:30,r:5},
+  {n:'Прыжки без скакалки',cue:'Лёгкие, на подушечках, кисти крутят воображаемую скакалку.',w:30,r:15}],
+  items:[
   {n:'Базовый прыжок',cue:'Мягко на подушечках, кисти крутят, локти у корпуса.',w:45,r:15},
-  {n:'С ноги на ногу',cue:'Лёгкий бег на месте через скакалку.',w:45,r:0}]},
- {id:'p-arms',name:'Руки и плечи',type:'weights',rounds:2,roundRest:45,desc:'Неопреновые гантели, два круга.',items:[
+  {n:'С ноги на ногу',cue:'Лёгкий бег на месте через скакалку.',w:45,r:0}],
+  cool:[
+  {n:'Растяжка икры — правая',cue:'Упор в стену, пятка на полу, колено прямое.',w:30,r:5},
+  {n:'Растяжка икры — левая',cue:'Упор в стену, пятка на полу, колено прямое.',w:30,r:0}]},
+ {id:'p-arms',name:'Руки и плечи',type:'weights',rounds:3,roundRest:60,desc:'Неопреновые гантели, три круга. Плечи, бицепс, трицепс и грудь.',
+  warm:[
+  {n:'Круги плечами',cue:'Назад и вперёд, плечи опускаются от ушей.',w:30,r:5},
+  {n:'Круги руками',cue:'Прямые руки, сначала маленькие круги, потом большие.',w:30,r:5},
+  {n:'Разведения без веса',cue:'Медленно, чтобы почувствовать плечи.',w:30,r:15}],
+  items:[
   {n:'Жим вверх стоя',cue:'Рёбра не раскрываются, пресс включён.',w:40,r:15},
   {n:'Разведения в стороны',cue:'До уровня плеч, медленно вниз.',w:40,r:15},
   {n:'Сгибания на бицепс',cue:'Локти прижаты, без раскачки.',w:40,r:15},
   {n:'Разгибания из-за головы',cue:'Одна гантель двумя руками, локти смотрят вперёд.',w:40,r:15},
-  {n:'Отжимания с колен',cue:'Тело одной линией от колен до макушки.',w:30,r:15}]},
- {id:'p-stretch',name:'Растяжка после танцев',type:'stretch',rounds:1,roundRest:0,desc:'Спокойно, на выдохе глубже. Подходит после хореографии.',items:[
+  {n:'Отжимания с колен',cue:'Тело одной линией от колен до макушки.',w:30,r:15}],
+  cool:[
+  {n:'Растяжка трицепса — правая',cue:'Локоть за головой, второй рукой мягко тянешь его вниз.',w:25,r:5},
+  {n:'Растяжка трицепса — левая',cue:'Локоть за головой, второй рукой мягко тянешь его вниз.',w:25,r:5},
+  {n:'Растяжка груди',cue:'Ладонь на дверной косяк на уровне плеча, корпус поворачивается от руки.',w:30,r:0}]},
+ {id:'p-stretch',name:'Растяжка после танцев',type:'stretch',rounds:1,roundRest:0,desc:'Спокойно, на выдохе глубже. Подходит после хореографии. Каждая сторона отдельно, таймер скажет, когда менять.',items:[
   {n:'Кошка-корова',cue:'Медленно, вместе с дыханием.',w:45,r:5},
-  {n:'Выпад с растяжкой бедра',cue:'По 30 секунд на ногу, таз подкручен.',w:60,r:5},
-  {n:'Голубь',cue:'По 30 секунд на сторону. Можно лечь грудью на пол.',w:60,r:5},
+  {n:'Выпад с растяжкой бедра — правая',cue:'Правое колено на полу, таз подкручен.',w:40,r:5},
+  {n:'Выпад с растяжкой бедра — левая',cue:'Левое колено на полу, таз подкручен.',w:40,r:5},
+  {n:'Голубь — правая нога',cue:'Можно лечь грудью на пол.',w:50,r:5},
+  {n:'Голубь — левая нога',cue:'Можно лечь грудью на пол.',w:50,r:5},
   {n:'Наклон к ногам сидя',cue:'Тянешься животом к бёдрам, не головой к коленям.',w:60,r:5},
-  {n:'Скрутка лёжа',cue:'По 30 секунд в сторону, плечи на полу.',w:60,r:5},
+  {n:'Скрутка лёжа — вправо',cue:'Плечи на полу, колени уходят в сторону.',w:40,r:5},
+  {n:'Скрутка лёжа — влево',cue:'Плечи на полу, колени уходят в сторону.',w:40,r:5},
   {n:'Поза ребёнка',cue:'Руки вперёд, дышим в спину.',w:60,r:0}]}
 ];
 const allPrograms=()=>[...S.programs.map(p=>({...p,mine:true})),...PRESETS];
 
 function buildSteps(p){
-  const out=[{kind:'prep',n:'Приготовься',cue:'Первое: '+p.items[0].n,dur:5}];
+  const out=[{kind:'prep',n:'Приготовься',cue:'',dur:10,sec:'prep'}];
+  const W=p.warm||[],Cl=p.cool||[];
+  const pushW=(it,sec,round)=>out.push({kind:'work',n:it.n,cue:it.cue||'',dur:Math.max(5,it.w),sec,round});
+  const pushR=(dur,n,sec,round)=>{if(dur>0)out.push({kind:'rest',n,cue:'',dur,sec,round})};
+  W.forEach((it,i)=>{pushW(it,'warm');pushR(i===W.length-1?Math.max(it.r,10):it.r,i===W.length-1?'Переход к основной части':'Отдых','warm')});
   for(let r=0;r<p.rounds;r++){
     p.items.forEach((it,i)=>{
-      out.push({kind:'work',n:it.n,cue:it.cue||'',dur:Math.max(5,it.w),round:r+1});
+      pushW(it,'main',r+1);
       const lastI=i===p.items.length-1,lastR=r===p.rounds-1;
-      if(lastI&&lastR)return;
-      const rest=lastI?(p.roundRest||it.r):it.r;
-      if(rest>0)out.push({kind:'rest',n:lastI?'Отдых между кругами':'Отдых',cue:'',dur:rest,round:r+1});
+      if(lastI&&lastR){if(Cl.length)pushR(Math.max(it.r,20),'Переход к заминке','main',r+1);return}
+      pushR(lastI?(p.roundRest||it.r):it.r,lastI?'Отдых между кругами':'Отдых','main',r+1);
     });
   }
+  Cl.forEach((it,i)=>{pushW(it,'cool');if(i<Cl.length-1)pushR(it.r,'Отдых','cool')});
+  while(out.length&&out[out.length-1].kind==='rest')out.pop();
   return out;
 }
 const totalSec=p=>buildSteps(p).slice(1).reduce((a,s)=>a+s.dur,0);
@@ -921,9 +973,9 @@ function renderProgs(){
   $('#progList').innerHTML=allPrograms().map(p=>{
     const t=totalSec(p);
     return `<article class="prog"><div class="prog-top"><h3>${esc(p.name)}</h3><span class="chip${p.mine?' mine':''}">${p.mine?'моя':esc(typeName(p.type))}</span></div>
-      <div class="prog-meta">≈ ${fmtMin(t)} мин · ${p.items.length} ${plural(p.items.length,'упражнение','упражнения','упражнений')} · ${p.rounds} ${plural(p.rounds,'круг','круга','кругов')}</div>
+      <div class="prog-meta">≈ ${fmtMin(t)} мин · ${p.items.length} ${plural(p.items.length,'упражнение','упражнения','упражнений')} · ${p.rounds} ${plural(p.rounds,'круг','круга','кругов')}${p.warm&&p.warm.length?' · с разминкой':''}</div>
       ${p.desc?`<p>${esc(p.desc)}</p>`:''}
-      <details class="ex"><summary>Состав</summary><ol>${p.items.map(it=>{const t=techFor(it.n);return `<li>${esc(it.n)} <span>· ${fmtS(it.w)}${it.r?' / отдых '+fmtS(it.r):''}</span>${t?`<button class="tlink" data-tech="${t.k}">техника</button>`:''}</li>`}).join('')}</ol></details>
+      <details class="ex"><summary>Состав</summary>${[['Разминка',p.warm],[p.rounds>1?`Основная часть · ${p.rounds} ${plural(p.rounds,'круг','круга','кругов')}`:'',p.items],['Заминка',p.cool]].filter(([,l])=>l&&l.length).map(([h,l])=>`${h?`<div class="ex-h">${h}</div>`:''}<ol>${l.map(it=>{const t=techFor(it.n);return `<li>${esc(it.n)} <span>· ${fmtS(it.w)}${it.r?' / отдых '+fmtS(it.r):''}</span>${t?`<button class="tlink" data-tech="${t.k}">техника</button>`:''}</li>`}).join('')}</ol>`).join('')}</details>
       <div class="prog-actions"><button class="btn" data-start="${p.id}">Начать</button>${p.mine?`<button class="btn ghost" data-edit="${p.id}">Изменить</button>`:`<button class="btn ghost" data-copy="${p.id}">Сделать свою версию</button>`}</div></article>`;
   }).join('');
 }
@@ -937,8 +989,9 @@ $('#progList').addEventListener('click',e=>{
 /* editor */
 let editing=null;
 function rowHTML(it={n:'',w:40,r:15}){return `<div class="ed-row"><input type="text" placeholder="Название" value="${esc(it.n)}" data-f="n" aria-label="Упражнение"><input type="number" min="5" max="900" value="${it.w}" data-f="w" inputmode="numeric" aria-label="Работа, сек"><input type="number" min="0" max="900" value="${it.r}" data-f="r" inputmode="numeric" aria-label="Отдых, сек"><button type="button" class="x" data-rm aria-label="Убрать">×</button>${it.cue?`<input type="hidden" data-f="cue" value="${esc(it.cue)}">`:''}</div>`}
+let edExtra={};
 function openEditor(p){
-  editing=p&&p.id?p.id:null;
+  editing=p&&p.id?p.id:null;edExtra={warm:p&&p.warm,cool:p&&p.cool};
   $('#edTitle').textContent=editing?'Изменить программу':'Своя программа';
   $('#eType').innerHTML=TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
   $('#eName').value=p?p.name:'';$('#eType').value=p?p.type:'weights';
@@ -955,6 +1008,7 @@ $('#editForm').addEventListener('submit',e=>{
   const items=[...$('#edRows').children].map(r=>{const g=f=>r.querySelector(`[data-f="${f}"]`);return{n:g('n').value.trim(),w:Math.max(5,+g('w').value||40),r:Math.max(0,+g('r').value||0),cue:g('cue')?g('cue').value:''}}).filter(i=>i.n);
   if(!items.length){$('#edRows input').focus();return}
   const p={id:editing||'m-'+uid(),name:$('#eName').value.trim()||'Моя программа',type:$('#eType').value,rounds:Math.max(1,+$('#eRounds').value||1),roundRest:Math.max(0,+$('#eRoundRest').value||0),items};
+  if(edExtra.warm)p.warm=edExtra.warm;if(edExtra.cool)p.cool=edExtra.cool;
   if(editing)S.programs=S.programs.map(x=>x.id===editing?p:x);else S.programs.unshift(p);
   save();$('#editSheet').hidden=true;renderProgs();
 });
@@ -977,21 +1031,29 @@ function startProgram(id){
   $('#player').hidden=false;lockScreen();setPlayIcon();drawStep();
   cancelAnimationFrame(P.raf);P.raf=requestAnimationFrame(tick);
 }
-function setPlayIcon(){$('#plPlay').textContent=P.running?'❚❚':'▶';$('#plPlay').setAttribute('aria-label',P.running?'Пауза':'Продолжить')}
+const IC_PAUSE='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4.4" height="14" rx="1.6" fill="currentColor"/><rect x="13.6" y="5" width="4.4" height="14" rx="1.6" fill="currentColor"/></svg>';
+const IC_PLAY='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.9v12.2c0 1 1.1 1.6 1.9 1.1l9.6-6.1a1.3 1.3 0 0 0 0-2.2L9.9 4.8C9.1 4.3 8 4.9 8 5.9z" fill="currentColor"/></svg>';
+function setPlayIcon(){$('#plPlay').innerHTML=P.running?IC_PAUSE:IC_PLAY;$('#plPlay').setAttribute('aria-label',P.running?'Пауза':'Продолжить')}
 function nextWork(i){for(let k=i+1;k<P.st.length;k++)if(P.st[k].kind==='work')return P.st[k];return null}
 function drawStep(){
   const s=P.st[P.i];
   $('#player').dataset.kind=s.kind;
-  $('#plPhase').textContent=s.kind==='prep'?'Старт через':s.kind==='rest'?'Отдых':`Работа · круг ${s.round} из ${P.prog.rounds}`;
-  if(s.kind==='rest'){const n=nextWork(P.i);$('#plEx').textContent=s.n;$('#plCue').textContent=n?n.cue:''}
-  else{$('#plEx').textContent=s.kind==='prep'?P.st[1].n:s.n;$('#plCue').textContent=s.kind==='prep'?P.st[1].cue:s.cue}
-  const n=nextWork(s.kind==='prep'?1:P.i);
-  $('#plNext').innerHTML=s.kind==='rest'?'':(n?`Дальше: <strong>${esc(n.n)}</strong>`:'Последнее упражнение');
+  const nw=s.kind==='work'?s:nextWork(P.i);
+  const works=P.st.filter(x=>x.kind==='work'),wi=nw?works.indexOf(nw)+1:works.length;
+  $('#plCount').textContent=`Упражнение ${wi} из ${works.length}`;
+  const secName=x=>x.sec==='warm'?'Разминка':x.sec==='cool'?'Заминка':P.prog.rounds>1?`Круг ${x.round} из ${P.prog.rounds}`:'Работа';
+  if(s.kind==='prep')$('#plPhase').textContent='Старт через';
+  else if(s.kind==='rest')$('#plPhase').textContent=s.n==='Отдых'?'Отдых · дальше':s.n;
+  else $('#plPhase').textContent=secName(s);
+  $('#plEx').textContent=nw?nw.n:'';$('#plCue').textContent=nw?nw.cue:'';
+  const after=s.kind==='work'?nextWork(P.i):(nw?nextWork(P.st.indexOf(nw)):null);
+  $('#plNext').innerHTML=s.kind==='work'?(after?`Дальше: <strong>${esc(after.n)}</strong>`:'Последнее упражнение'):'';
+  $('#plAdd').hidden=s.kind!=='rest';
   $('#plBar').style.width=(P.i/(P.st.length-1)*100)+'%';
-  const exName=s.kind==='work'?s.n:(nextWork(P.i)||{}).n;
-  const t=techFor(exName),pf=$('#plFig');
+  const t=techFor(nw&&nw.n),pf=$('#plFig');
   $('#player').classList.toggle('has-fig',!!t);pf.hidden=!t;
-  if(t&&pf.dataset.k!==t.k){pf.dataset.k=t.k;pf.innerHTML='<span>техника</span>';mountFig(pf,t.k)}
+  if(t&&pf.dataset.k!==t.k){pf.dataset.k=t.k;pf.innerHTML='<span></span>';mountFig(pf,t.k)}
+  if(t)pf.querySelector('span').textContent=s.kind==='work'?'техника':'дальше';
   if(!t){pf.dataset.k='';pf.innerHTML=''}
 }
 function drawTime(){
@@ -1026,6 +1088,7 @@ function finish(){
 function closePlayer(){if(P)cancelAnimationFrame(P.raf);P=null;$('#player').hidden=true;try{wake&&wake.release()}catch(e){}wake=null}
 $('#plPlay').onclick=()=>{P.running=!P.running;P.last=performance.now();setPlayIcon()};
 $('#plSkip').onclick=()=>go(P.i+1);
+$('#plAdd').onclick=()=>{if(P&&P.st[P.i].kind==='rest'){P.left+=15;P.st[P.i]={...P.st[P.i],dur:P.st[P.i].dur+15};drawTime()}};
 $('#plPrev').onclick=()=>{const s=P.st[P.i];go(s.dur-P.left>2?P.i:P.i-1)};
 $('#plClose').onclick=()=>{if(P&&P.spent>=60&&$('#plDone').hidden)finish();else closePlayer()};
 $('#plNoSave').onclick=closePlayer;
