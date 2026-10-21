@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#1B0C13" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="apple-touch-icon" href="icon-180.png?v=2">
 <title>Ритм</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Ритм">
@@ -336,7 +336,7 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
 /* FIG ENGINE START */
 const FIG=(()=>{
 /* poses are authored on a full-size skeleton; the chibi body is that skeleton scaled by K toward the floor, with an unscaled big head */
-const K=0.6,KA=0.7,GY=188,CX=100;
+const K=0.6,KA=0.7,KL=0.47,GY=188,CX=100;
 const L={tor:50,up:28,fo:26,th:42,sh:40,neck:21,R:29,sw:11,hw:8};
 const D=Math.PI/180;
 const CAT={base:'#2B2535',mid:'#352E41',far:'#1A1520',hi:'#625873',lo:'#120E17',inner:'#463C55',eye:'#CFF6F3',eyeHi:'#F2FFFE',eyeLo:'#8FDCE0',nose:'#F59BC4',tongue:'#F07AAE',bean:'#F58BBF',mouth:'#1A1520'};
@@ -387,16 +387,20 @@ function poseAt(ex,t){
 function skel(p,headA){
   const front=p.v==='front';
   const tl=L.tor*(p.tl||1)*K;
-  const hip=T(p.hip),td=dir(p.tor),neck=add(hip,td,tl);
+  let hip=T(p.hip);
+  /* shorter legs: for standing poses pull the hip toward the feet so the knee bend is kept */
+  if(p.ln&&p.ln.t&&!p.ln.rel&&p.ln.t[1]-p.hip[1]>30){const an=T(p.ln.t),ax=front?hip[0]:an[0],r=KL/K;hip=[ax+(hip[0]-ax)*r,an[1]+(hip[1]-an[1])*r]}
+  const td=dir(p.tor),neck=add(hip,td,tl);
   const hc=add(neck,dir(headA),L.neck);
   const perp=[Math.cos(p.tor*D),Math.sin(p.tor*D)];
   const sh={l:front?add(add(neck,perp,-L.sw),td,-3):add(neck,td,-3),r:front?add(add(neck,perp,L.sw),td,-3):add(neck,td,-3)};
   const hp={l:front?add(hip,perp,-L.hw):hip,r:front?add(hip,perp,L.hw):hip};
   const refs={shoulder:neck,hip};
+  const LK=(p.ln&&p.ln.t&&!p.ln.rel&&p.ln.t[1]-p.hip[1]>30)?KL:K;
   const lf=p.ln,ff=p.sym?mirrorSpec(lf,p.hip[0]):p.lf;
   const an=p.an,af=p.symA?mirrorSpec(an,p.hip[0]):p.af;
   return {front,tl,hip,td,neck,hc,perp,sh,hp,lf,ff,
-    legN:limb(hp.l,lf,L.th*K,L.sh*K,refs),legF:limb(hp.r,ff,L.th*K,L.sh*K,refs),
+    legN:limb(hp.l,lf,L.th*LK,L.sh*LK,refs),legF:limb(hp.r,ff,L.th*LK,L.sh*LK,refs),
     armN:limb(sh.l,an,L.up*KA,L.fo*KA,refs),armF:limb(sh.r,af,L.up*KA,L.fo*KA,refs)};
 }
 /* ---- drawing: 2D kawaii, one outlined silhouette, soft noodle limbs ---- */
@@ -638,8 +642,8 @@ const EX={
   const bt={...st,hip:[82,142],tor:30,head:12};
   return downFirst(st,bt)})()},
  row:{dur:2.8,k:(()=>{
-  const dn={v:'side',hip:[82,110],tor:72,head:50,ln:{t:[100,178],s:-1},lf:{t:[104,178],s:-1},an:{a:[182,180]},af:{t:[-24,42],rel:'shoulder',s:1},eq:{type:'kb',at:'hn',mode:'down'}};
-  const up={...dn,an:{a:[255,182]}};
+  const dn={v:'side',hip:[86,98],tor:58,head:40,ln:{t:[100,178],s:-1},lf:{t:[104,178],s:-1},an:{a:[176,172]},af:{t:[-24,42],rel:'shoulder',s:1},eq:{type:'kb',at:'hn',mode:'down'}};
+  const up={...dn,an:{a:[248,176]}};
   return upFirst(dn,up)})()},
  bridge:{dur:2.8,k:(()=>{
   const dn={v:'side',hip:[122,166],tor:272,head:300,ln:{t:[152,178],s:-1},lf:{t:[155,178],s:-1},an:{t:[0,-20],rel:'hip',s:-1},af:{t:[2,-20],rel:'hip',s:-1},eq:{type:'kb',at:'hip',o:[0,-24]}};
