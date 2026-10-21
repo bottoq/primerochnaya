@@ -332,11 +332,13 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
 <script>
 /* FIG ENGINE START */
 const FIG=(()=>{
-const L={tor:50,neck:15,head:10,up:28,fo:26,th:42,sh:40,foot:12,sw:17,hw:9};
-const D=Math.PI/180;let BG='#fff';
+const L={tor:50,neck:19,head:21,up:28,fo:26,th:42,sh:40,foot:7,sw:17,hw:11};
+const D=Math.PI/180;
+const CAT={fur:'#F3C29E',far:'#DDA07A',belly:'#FFEADB',line:'#3A1426',ear:'#F59DB6',nose:'#E0507C',stripe:'#D9936B'};
 const dir=a=>[Math.sin(a*D),-Math.cos(a*D)];
 const add=(p,v,k=1)=>[p[0]+v[0]*k,p[1]+v[1]*k];
 const ang=(a,b)=>Math.atan2(b[0]-a[0],-(b[1]-a[1]))/D;
+const f1=n=>n.toFixed(1),pt=p=>f1(p[0])+' '+f1(p[1]);
 function ik(r,t,l1,l2,s){
   const dx=t[0]-r[0],dy=t[1]-r[1],d=Math.hypot(dx,dy)||0.001;
   const dm=Math.min(l1+l2-0.01,Math.max(Math.abs(l1-l2)+0.01,d));
@@ -373,68 +375,100 @@ function poseAt(ex,t){
   }
   return ks[0][1];
 }
-const seg=(a,b,w,c,op)=>`<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"${op?` opacity="${op}"`:''}/>`;
+/* drawing helpers */
+const poly=(pts,w,fur,o=true)=>{const d='M'+pts.map(pt).join(' L');return (o?`<path d="${d}" fill="none" stroke="${CAT.line}" stroke-width="${w+5}" stroke-linecap="round" stroke-linejoin="round"/>`:'')+`<path d="${d}" fill="none" stroke="${fur}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`};
+const ell=(c,rx,ry,rot,fill,o=true)=>`<ellipse cx="${f1(c[0])}" cy="${f1(c[1])}" rx="${rx}" ry="${ry}" transform="rotate(${f1(rot)} ${f1(c[0])} ${f1(c[1])})" fill="${fill}"${o?` stroke="${CAT.line}" stroke-width="2.5"`:''}/>`;
 function kb(c,col,rot=0){
-  return `<g transform="translate(${c[0].toFixed(1)} ${c[1].toFixed(1)}) rotate(${rot.toFixed(1)})"><path d="M-5 -6 Q-5 -15 0 -15 Q5 -15 5 -6" fill="none" stroke="${col}" stroke-width="2.6"/><circle r="8.5" cy="1" fill="${col}"/></g>`;
+  return `<g transform="translate(${f1(c[0])} ${f1(c[1])}) rotate(${f1(rot)})"><path d="M-5.5 -6 Q-5.5 -16 0 -16 Q5.5 -16 5.5 -6" fill="none" stroke="${CAT.line}" stroke-width="5.5" stroke-linecap="round"/><path d="M-5.5 -6 Q-5.5 -16 0 -16 Q5.5 -16 5.5 -6" fill="none" stroke="${col}" stroke-width="2.6" stroke-linecap="round"/><circle r="9.5" cy="1" fill="${col}" stroke="${CAT.line}" stroke-width="2.5"/><path d="M-4 -2 Q-2 -5 2 -5" stroke="#fff" stroke-opacity=".55" stroke-width="2" fill="none" stroke-linecap="round"/></g>`;
 }
 function db(c,a,col,mode){
-  if(mode==='end')return `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="6.5" fill="${col}"/><circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="2.2" fill="${BG}"/>`;
-  const v=dir(a),p1=add(c,v,-9),p2=add(c,v,9);
-  return seg(p1,p2,3,col)+seg(add(p1,v,-1),add(p1,v,2),11,col)+seg(add(p2,v,-2),add(p2,v,1),11,col);
+  if(mode==='end')return `<circle cx="${f1(c[0])}" cy="${f1(c[1])}" r="7.5" fill="${col}" stroke="${CAT.line}" stroke-width="2.5"/><circle cx="${f1(c[0])}" cy="${f1(c[1])}" r="2.4" fill="${CAT.line}"/>`;
+  const v=dir(a),p1=add(c,v,-10),p2=add(c,v,10);
+  return poly([p1,p2],3,col)+poly([add(p1,v,-1.5),add(p1,v,1.5)],10,col)+poly([add(p2,v,-1.5),add(p2,v,1.5)],10,col);
 }
-function render(p,C){
-  const out=[];const G=C.ground;BG=C.bg;
-  out.push(`<line x1="8" y1="${G}" x2="192" y2="${G}" stroke="${C.line}" stroke-width="2" stroke-linecap="round"/>`);
+function head(c,a,front,eff){
+  const ax=dir(a),pp=dir(a+90),R=L.head,o=[];
+  const P=(x,y)=>add(add(c,pp,x),ax,y);
+  // ears
+  [[-1],[1]].forEach(([sd])=>{
+    const b1=P(sd*5,R*.72),b2=P(sd*R*.98,R*.25),tip=P(sd*R*.88,R+11);
+    o.push(`<path d="M${pt(b1)} L${pt(tip)} L${pt(b2)} Z" fill="${CAT.fur}" stroke="${CAT.line}" stroke-width="2.5" stroke-linejoin="round"/>`);
+    const i1=P(sd*8,R*.66),i2=P(sd*R*.86,R*.32),it=P(sd*R*.84,R+5);
+    o.push(`<path d="M${pt(i1)} L${pt(it)} L${pt(i2)} Z" fill="${CAT.ear}"/>`);
+  });
+  o.push(`<ellipse cx="${f1(c[0])}" cy="${f1(c[1])}" rx="${R+2}" ry="${R}" transform="rotate(${f1(a)} ${f1(c[0])} ${f1(c[1])})" fill="${CAT.fur}" stroke="${CAT.line}" stroke-width="2.5"/>`);
+  // forehead stripes
+  [-5,0,5].forEach(x=>o.push(`<path d="M${pt(P(x,R-1))} L${pt(P(x*.8,R-6))}" stroke="${CAT.stripe}" stroke-width="2.4" stroke-linecap="round"/>`));
+  const fx=front?0:6; // shift face toward facing side
+  const eyes=front?[-7,7]:[fx-3,fx+8];
+  eyes.forEach(x=>{const e=P(x,1);
+    if(eff>.5){const l=P(x-3,0),r=P(x+3,0),m=P(x,3.2);o.push(`<path d="M${pt(l)} Q${pt(m)} ${pt(r)}" stroke="${CAT.line}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`)}
+    else o.push(`<circle cx="${f1(e[0])}" cy="${f1(e[1])}" r="2.6" fill="${CAT.line}"/><circle cx="${f1(e[0]+.8)}" cy="${f1(e[1]-.9)}" r=".9" fill="#fff"/>`)});
+  const nx=front?0:fx+3, n=P(nx,-5);
+  o.push(`<path d="M${pt(P(nx-2.4,-4))} L${pt(P(nx+2.4,-4))} L${pt(P(nx,-6.4))} Z" fill="${CAT.nose}" stroke="${CAT.nose}" stroke-width="1.2" stroke-linejoin="round"/>`);
+  o.push(`<path d="M${pt(P(nx-3.5,-8.5))} Q${pt(P(nx-1.7,-10.5))} ${pt(P(nx,-7))} Q${pt(P(nx+1.7,-10.5))} ${pt(P(nx+3.5,-8.5))}" stroke="${CAT.line}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`);
+  const bl=front?[-11,11]:[fx-7,fx+12];
+  bl.forEach(x=>{const b=P(x,-5);o.push(`<ellipse cx="${f1(b[0])}" cy="${f1(b[1])}" rx="3.6" ry="2.2" transform="rotate(${f1(a)} ${f1(b[0])} ${f1(b[1])})" fill="${CAT.ear}" opacity=".8"/>`)});
+  const ws=front?[-1,1]:[1];
+  ws.forEach(sd=>[-2,2].forEach(dy=>{const s0=P(sd*(front?9:fx+9),-6+dy*.6),s1=P(sd*(front?24:fx+26),-6+dy*2.4);o.push(`<path d="M${pt(s0)} L${pt(s1)}" stroke="${CAT.line}" stroke-width="1.1" stroke-linecap="round" opacity=".8"/>`)}));
+  return o.join('');
+}
+function tail(hip,tor,front,t){
+  const w=Math.sin(t*3)*6;
+  let sd=front?1:-1;const ax=dir(tor),pp=dir(tor+90);
+  const P=(x,y)=>add(add(hip,pp,x),ax,y);
+  const a=P(sd*8,4),b=P(sd*(front?30:34),-8),c=P(sd*(front?30:36)+w*.4,26+w*.5),e=P(sd*(front?22:26)+w,40);
+  const d=`M${pt(a)} C${pt(b)} ${pt(c)} ${pt(e)}`;
+  return `<path d="${d}" fill="none" stroke="${CAT.line}" stroke-width="13" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${CAT.fur}" stroke-width="8" stroke-linecap="round"/><path d="M${pt(add(e,ax,0))} L${pt(add(e,ax,-.1))}" stroke="${CAT.stripe}" stroke-width="8" stroke-linecap="round"/>`;
+}
+function render(p,C,t=0){
+  const out=[];const G=C.ground;
+  out.push(`<line x1="6" y1="${G}" x2="194" y2="${G}" stroke="${C.line}" stroke-width="2.5" stroke-linecap="round"/>`);
   const tl=L.tor*(p.tl||1);
   const hip=p.hip,td=dir(p.tor),neck=add(hip,td,tl);
-  const head=add(neck,dir(p.head??p.tor),L.neck);
+  const hc=add(neck,dir(p.head??p.tor),L.neck);
   const front=p.v==='front';
   const perp=[Math.cos(p.tor*D),Math.sin(p.tor*D)];
-  const sh={l:front?add(neck,perp,-L.sw):neck,r:front?add(neck,perp,L.sw):neck};
+  const sh={l:front?add(neck,perp,-L.sw):add(neck,td,-4),r:front?add(neck,perp,L.sw):add(neck,td,-4)};
   const hp={l:front?add(hip,perp,-L.hw):hip,r:front?add(hip,perp,L.hw):hip};
   const refs={shoulder:neck,hip};
   const an=p.an,lf=p.ln;
   const af=p.symA?mirrorSpec(an,hip[0]):p.af, ff=p.sym?mirrorSpec(lf,hip[0]):p.lf;
   const legN=limb(hp.l,lf,L.th,L.sh,refs),legF=limb(hp.r,ff,L.th,L.sh,refs);
   const armN=limb(sh.l,an,L.up,L.fo,refs),armF=limb(sh.r,af,L.up,L.fo,refs);
-  const foot=(leg,spec,root,def)=>{const fa=spec.f!=null?spec.f:def;return seg(leg[1],add(leg[1],dir(fa),L.foot),7,'C')};
-  const drawLeg=(root,leg,spec,col,op,def)=>seg(root,leg[0],10,col,op)+seg(leg[0],leg[1],9,col,op)+foot(leg,spec,root,def).replace('"C"',`"${col}"`).replace('/>',op?` opacity="${op}"/>`:'/>');
-  const drawArm=(root,arm,col,op)=>seg(root,arm[0],8,col,op)+seg(arm[0],arm[1],7.5,col,op);
+  const leg=(root,lg,spec,fur,def)=>{const fa=spec.f!=null?spec.f:def;return poly([root,lg[0],lg[1]],17,fur)+poly([lg[1],add(lg[1],dir(fa),L.foot)],16,fur)};
+  const arm=(root,am,fur)=>poly([root,am[0],am[1]],14,fur);
   const eq=p.eq,EQ=[];
   if(eq){
-    const hand=eq.at==='hf'?armF:armN;
-    const fa=ang(hand[0],hand[1]);
+    const hand=eq.at==='hf'?armF:armN;const fa=ang(hand[0],hand[1]);
     const pts=eq.at==='both'?[armN,armF]:[hand];
     if(eq.type==='kb'){
       let c,rot=0;
       if(eq.at==='hip')c=add(hip,[eq.o?eq.o[0]:0,eq.o?eq.o[1]:-12]);
-      else if(eq.at==='mid'){c=[(armN[1][0]+armF[1][0])/2,(armN[1][1]+armF[1][1])/2+8]}
-      else if(eq.mode==='arm'){c=add(hand[1],dir(fa),11);rot=fa-180}
-      else c=add(hand[1],[0,9]);
+      else if(eq.at==='mid'){c=[(armN[1][0]+armF[1][0])/2,(armN[1][1]+armF[1][1])/2+10]}
+      else if(eq.mode==='arm'){c=add(hand[1],dir(fa),13);rot=fa-180}
+      else c=add(hand[1],[0,11]);
       EQ.push(kb(c,C.acc,rot));
-    }else{
-      pts.forEach(h=>{const a=ang(h[0],h[1]);
-        if(eq.mode==='h')EQ.push(db(h[1],90,C.acc,'bar'));
-        else if(eq.mode==='along')EQ.push(db(add(h[1],dir(a),3),a,C.acc,'bar'));
-        else EQ.push(db(h[1],0,C.acc,'end'))});
-    }
+    }else pts.forEach(h=>{const a=ang(h[0],h[1]);
+      if(eq.mode==='h')EQ.push(db(h[1],90,C.acc));
+      else if(eq.mode==='along')EQ.push(db(add(h[1],dir(a),4),a,C.acc));
+      else EQ.push(db(h[1],0,C.acc,'end'))});
   }
-  const torso=front
-    ?`<polygon points="${[sh.l,sh.r,hp.r,hp.l].map(q=>q.map(n=>n.toFixed(1)).join(',')).join(' ')}" fill="${C.ink}" stroke="${C.ink}" stroke-width="7" stroke-linejoin="round"/>`
-    :seg(hip,neck,15,C.ink);
-  const headC=`<circle cx="${head[0].toFixed(1)}" cy="${head[1].toFixed(1)}" r="${L.head}" fill="${C.ink}"/>`;
+  const mid=add(hip,td,tl*.45);
+  const body=front
+    ?ell(add(mid,td,-2),36,tl*.64+8,p.tor,CAT.fur)+ell(add(mid,td,-5),22,tl*.46,p.tor,CAT.belly,false)
+    :ell(add(mid,td,-2),31,tl*.64+9,p.tor,CAT.fur)+ell(add(add(mid,perp,11),td,-4),15,tl*.48,p.tor,CAT.belly,false);
+  const H=head(hc,p.head??p.tor,front,p.eff||0);
   if(front){
-    const legs=drawLeg(hp.l,legN,lf,C.ink,0,p.fl??-100)+drawLeg(hp.r,legF,ff,C.ink,0,p.fl!=null?-p.fl:100);
-    if(p.legsFront)out.push(torso,headC,`<g stroke="${C.bg}" stroke-width="3">`+legs.replace(/stroke="[^"]*" stroke-width="(\d+\.?\d*)"/g,(m,w)=>`stroke="${C.bg}" stroke-width="${+w+4}"`)+'</g>',legs);
-    else out.push(legs,torso,headC);
-    if(eq&&eq.behind)out.push(...EQ);
-    out.push(drawArm(sh.l,armN,C.ink),drawArm(sh.r,armF,C.ink));
-    if(!(eq&&eq.behind))out.push(...EQ);
+    const legs=leg(hp.l,legN,lf,CAT.fur,p.fl??-100)+leg(hp.r,legF,ff,CAT.fur,p.fl!=null?-p.fl:100);
+    out.push(tail(hip,p.tor,true,t));
+    if(p.legsFront)out.push(body,H,legs);else out.push(legs,body,H);
+    out.push(arm(sh.l,armN,CAT.fur),arm(sh.r,armF,CAT.fur),...EQ);
   }else{
-    out.push(drawArm(sh.r,armF,C.far,.9),drawLeg(hp.r,legF,ff,C.far,.9,90),torso,drawLeg(hp.l,legN,lf,C.ink,0,90));
-    if(!p.headTop)out.push(headC);
-    out.push(drawArm(sh.l,armN,C.ink),...EQ);
-    if(p.headTop)out.push(headC);
+    out.push(arm(sh.r,armF,CAT.far),leg(hp.r,legF,ff,CAT.far,90),tail(hip,p.tor,false,t),body,leg(hp.l,legN,lf,CAT.fur,90));
+    if(!p.headTop)out.push(H);
+    out.push(arm(sh.l,armN,CAT.fur),...EQ);
+    if(p.headTop)out.push(H);
   }
   return out.join('');
 }
@@ -442,11 +476,11 @@ return {render,poseAt};
 })();
 /* FIG ENGINE END */
 /* EX DATA START */
-const SIDE_LEGS={ln:{t:[102,180],s:-1},lf:{t:[106,180],s:-1}};
-const FRONT_LEGS={ln:{t:[88,180],s:1},sym:1};
+const SIDE_LEGS={ln:{t:[102,178],s:-1},lf:{t:[106,178],s:-1}};
+const FRONT_LEGS={ln:{t:[88,178],s:1},sym:1};
 const EX={
  swing:{dur:2.2,k:(()=>{
-  const hike={v:'side',hip:[80,110],tor:62,head:50,ln:{t:[100,180],s:-1},lf:{t:[104,180],s:-1},an:{a:[205,205]},af:{a:[203,203]},eq:{type:'kb',at:'hn',mode:'arm'}};
+  const hike={v:'side',hip:[80,110],tor:62,head:50,ln:{t:[100,178],s:-1},lf:{t:[104,178],s:-1},an:{a:[205,205]},af:{a:[203,203]},eq:{type:'kb',at:'hn',mode:'arm'}};
   const top={...hike,hip:[100,99],tor:-4,head:-2,an:{a:[88,88]},af:{a:[90,90]}};
   return [[0,hike],[0.45,top],[0.55,top],[1,hike]]})()},
  goblet:{dur:3,k:(()=>{
@@ -454,12 +488,12 @@ const EX={
   const bt={...st,hip:[82,142],tor:30,head:18};
   return [[0,st],[0.15,st],[0.55,bt],[0.68,bt],[1,st]]})()},
  row:{dur:2.6,k:(()=>{
-  const dn={v:'side',hip:[82,110],tor:72,head:62,ln:{t:[100,180],s:-1},lf:{t:[104,180],s:-1},an:{a:[182,180]},af:{t:[-24,42],rel:'shoulder',s:1},eq:{type:'kb',at:'hn',mode:'down'}};
+  const dn={v:'side',hip:[82,110],tor:72,head:62,ln:{t:[100,178],s:-1},lf:{t:[104,178],s:-1},an:{a:[182,180]},af:{t:[-24,42],rel:'shoulder',s:1},eq:{type:'kb',at:'hn',mode:'down'}};
   const up={...dn,an:{a:[255,182]}};
   return [[0,dn],[0.15,dn],[0.5,up],[0.62,up],[1,dn]]})()},
  bridge:{dur:2.6,k:(()=>{
-  const dn={v:'side',hip:[100,177],tor:270,head:270,ln:{t:[128,180],s:-1},lf:{t:[131,180],s:-1},an:{t:[0,-11],rel:'hip',s:-1},af:{t:[2,-11],rel:'hip',s:-1},eq:{type:'kb',at:'hip',o:[0,-14]}};
-  const up={...dn,hip:[92,148],tor:234.5,head:270};
+  const dn={v:'side',hip:[100,166],tor:272,head:276,ln:{t:[130,178],s:-1},lf:{t:[133,178],s:-1},an:{t:[0,-20],rel:'hip',s:-1},af:{t:[2,-20],rel:'hip',s:-1},eq:{type:'kb',at:'hip',o:[0,-24]}};
+  const up={...dn,hip:[94,134],tor:236,head:262};
   return [[0,dn],[0.15,dn],[0.5,up],[0.65,up],[1,dn]]})()},
  twist:{dur:2.4,k:(()=>{
   const base={v:'front',hip:[100,172],tor:0,tl:.9,head:0,ln:{a:[-9,191],l:[34,43]},sym:1,legsFront:1,fl:-100,eq:{type:'kb',at:'mid'}};
@@ -468,7 +502,7 @@ const EX={
   return [[0,L],[0.1,L],[0.5,R],[0.6,R],[1,L]]})()},
  press:{dur:2.6,k:(()=>{
   const rack={v:'front',hip:[100,99],tor:0,head:0,...FRONT_LEGS,an:{t:[66,38],s:-1},symA:1,eq:{type:'db',at:'both',mode:'h'}};
-  const top={...rack,an:{t:[82,-3],s:-1}};
+  const top={...rack,an:{t:[68,-6],s:-1}};
   return [[0,rack],[0.12,rack],[0.5,top],[0.6,top],[1,rack]]})()},
  lateral:{dur:2.6,k:(()=>{
   const dn={v:'front',hip:[100,99],tor:0,head:0,...FRONT_LEGS,an:{a:[192,184]},symA:1,eq:{type:'db',at:'both',mode:'end'}};
@@ -483,10 +517,11 @@ const EX={
   const up={...dn,an:{a:[8,368]},af:{a:[6,366]}};
   return [[0,dn],[0.12,dn],[0.5,up],[0.6,up],[1,dn]]})()},
  pushup:{dur:2.4,k:(()=>{
-  const up={v:'side',hip:[84.2,157.1],tor:57,head:62,ln:{t:[10.4,169.6],s:-1,f:200},lf:{t:[14,168],s:-1,f:200},an:{t:[130,183],s:1},af:{t:[134,183],s:1}};
-  const dn={...up,hip:[90,170.9],tor:77.5,head:80};
+  const up={v:'side',hip:[82,148],tor:57,head:66,ln:{t:[10,162],s:-1,f:200},lf:{t:[14,160],s:-1,f:200},an:{t:[128,177],s:1},af:{t:[132,177],s:1}};
+  const dn={...up,hip:[88,158],tor:74,head:68};
   return [[0,up],[0.12,up],[0.5,dn],[0.6,dn],[1,up]]})()}
 };
+for(const key in EX){EX[key].k=EX[key].k.map(([t,p])=>[t,{...p,eff:(t>=0.4&&t<=0.7)?1:0}])}
 /* EX DATA END */
 /* TECH START */
 const TECH=[
@@ -535,9 +570,9 @@ const techFor=name=>{const n=String(name||'').toLowerCase();return TECH.find(t=>
 
 const FIGS=new Set();let figRaf=0,figColors=null,figColorAge=0;
 const reduceMotion=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-function figColorsFor(el){const cs=getComputedStyle(el),g=v=>cs.getPropertyValue(v).trim();return{ink:g('--ink'),far:g('--fig-far'),acc:g('--accent'),line:g('--line'),bg:g('--fig-bg'),ground:184}}
+function figColorsFor(el){const cs=getComputedStyle(el),g=v=>cs.getPropertyValue(v).trim();return{ink:g('--ink'),far:g('--fig-far'),acc:g('--accent'),line:g('--line'),bg:g('--fig-bg'),ground:188}}
 function mountFig(host,key){
-  host.innerHTML=`<svg viewBox="0 -14 200 204" role="img" aria-label="Анимация техники"><g></g></svg>`;
+  host.innerHTML=`<svg viewBox="0 -14 200 204" role="img" aria-label="Котик показывает технику"><g></g></svg>`;
   const f={host,g:host.querySelector('g'),key,t0:performance.now(),vis:true};
   if(reduceMotion){f.g.innerHTML=FIG.render(FIG.poseAt(EX[key],EX[key].dur*0.5),figColorsFor(host));return f}
   FIGS.add(f);
@@ -551,7 +586,7 @@ function figLoop(now){
     if(!f.host.isConnected||!f.g.isConnected){FIGS.delete(f);f.io&&f.io.disconnect();continue}
     if(!f.vis||f.host.closest('[hidden]'))continue;
     if(!f.c||(now-(f.cAt||0))>1000){f.c=figColorsFor(f.host);f.cAt=now}
-    const ex=EX[f.key];f.g.innerHTML=FIG.render(FIG.poseAt(ex,(now-f.t0)/1000),f.c);
+    const ex=EX[f.key];const tt=(now-f.t0)/1000;f.g.innerHTML=FIG.render(FIG.poseAt(ex,tt),f.c,tt);
   }
   if(FIGS.size)figRaf=requestAnimationFrame(figLoop);
 }
