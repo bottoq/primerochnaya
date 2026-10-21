@@ -401,27 +401,47 @@ function skel(p,headA){
 }
 /* ---- drawing: matte 3D look, no outlines, light from top-left ---- */
 const HI=[-1.1,-1.4],LO=[1.2,1.5];
-function tube(pts,w1,w2,near){
-  const [a,b,c]=pts;const col=near?CAT.mid:CAT.far;let s='';
-  if(near){s+=`<path d="M${pt(a)} L${pt(b)} L${pt(c)}" fill="none" stroke="#5E5470" stroke-width="${w1+2.6}" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;s+=`<path d="M${pt(add(a,LO))} L${pt(add(b,LO))} L${pt(add(c,LO))}" fill="none" stroke="${CAT.lo}" stroke-width="${w2+1}" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>`}
-  s+=`<path d="M${pt(a)} L${pt(b)}" stroke="${col}" stroke-width="${w1}" stroke-linecap="round"/><path d="M${pt(b)} L${pt(c)}" stroke="${col}" stroke-width="${w2}" stroke-linecap="round"/>`;
-  if(near)s+=`<path d="M${pt(add(a,HI))} L${pt(add(b,HI))} L${pt(add(c,HI))}" fill="none" stroke="${CAT.hi}" stroke-width="${f1(w2*.32)}" stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>`;
-  return s;
+/* limbs are one soft noodle: quadratic curve through the joint, tapering from a wide root that melts into the body */
+const RIM='#7A6E92';
+function noodle(R,J,E,w0,w1,w2,near,gid){
+  const Cc=[2*J[0]-(R[0]+E[0])/2,2*J[1]-(R[1]+E[1])/2];
+  const N=16,Lp=[],Rp=[],C=[];
+  for(let i=0;i<=N;i++){
+    const t=i/N,u=1-t;
+    const p=[u*u*R[0]+2*u*t*Cc[0]+t*t*E[0],u*u*R[1]+2*u*t*Cc[1]+t*t*E[1]];
+    const d=[2*u*(Cc[0]-R[0])+2*t*(E[0]-Cc[0]),2*u*(Cc[1]-R[1])+2*t*(E[1]-Cc[1])];
+    const dl=Math.hypot(d[0],d[1])||1,n=[-d[1]/dl,d[0]/dl];
+    const w=(t<.5?w0+(w1-w0)*(t/.5):w1+(w2-w1)*((t-.5)/.5))/2;
+    C.push(p);Lp.push(add(p,n,w));Rp.push(add(p,n,-w));
+  }
+  const poly='M'+Lp.map(pt).join(' L')+' L'+Rp.slice().reverse().map(pt).join(' L')+'Z';
+  const fill=near?`url(#fu${gid})`:`url(#ff${gid})`;
+  let rim='';
+  if(near){
+    const k0=Math.round(N*.42);
+    const side=a=>'M'+a.slice(k0).map(pt).join(' L');
+    rim=`<path d="${side(Lp)}" stroke="${RIM}" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="${side(Rp)}" stroke="${RIM}" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }
+  let hl='';
+  if(near){const o=[-2.2,-2.6];hl=`<path d="M${C.slice(Math.round(N*.3),N).map(q=>pt(add(q,o))).join(' L')}" stroke="#7B6F90" stroke-width="${f1(w2*.32)}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>`}
+  return {rim,fill:`<path d="${poly}" fill="${fill}"/><circle cx="${f1(R[0])}" cy="${f1(R[1])}" r="${f1(w0/2)}" fill="${fill}"/>`+hl,end:E,dirEnd:ang(C[N-2],E)};
 }
-function paw(p,a,near,r=6.2){
-  const c=add(p,dir(a),1.2);
-  return (near?`<circle cx="${f1(c[0])}" cy="${f1(c[1])}" r="${r+1.3}" fill="#5E5470"/>`:'')+`<circle cx="${f1(c[0])}" cy="${f1(c[1])}" r="${r}" fill="${near?'url(#pw'+GIDc+')':CAT.far}"/>`;
+function paw(p,a,near,gid,r=6.4){
+  const c=add(p,dir(a),1.4);const fill=near?`url(#fu${gid})`:`url(#ff${gid})`;
+  return {rim:near?`<circle cx="${f1(c[0])}" cy="${f1(c[1])}" r="${r}" fill="none" stroke="${RIM}" stroke-width="3.2"/>`:'',
+    fill:`<circle cx="${f1(c[0])}" cy="${f1(c[1])}" r="${r}" fill="${fill}"/>`};
 }
 let GIDc=0;
-function foot(p,a,near,beans,front){
-  const v=dir(a),c=add(p,v,3.5),pp=dir(a+90);
-  let s=`<ellipse cx="${f1(c[0])}" cy="${f1(c[1])}" rx="9.5" ry="6.6" transform="rotate(${f1(a-90)} ${f1(c[0])} ${f1(c[1])})" fill="${near?'url(#pw'+GIDc+')':CAT.far}"/>`;
+function foot(p,a,near,beans,front,gid){
+  const v=dir(a),c=add(p,v,3.5),pp=dir(a+90);const fill=near?`url(#fu${gid})`:`url(#ff${gid})`;
+  const E=(extra)=>`<ellipse cx="${f1(c[0])}" cy="${f1(c[1])}" rx="9.8" ry="6.8" transform="rotate(${f1(a-90)} ${f1(c[0])} ${f1(c[1])})" ${extra}/>`;
+  let f=E(`fill="${fill}"`);
   if(beans&&near){
-    const m=front?add(c,[0,0]):add(c,v,2.5);
-    s+=`<ellipse cx="${f1(m[0])}" cy="${f1(m[1]+1)}" rx="2.6" ry="2.1" fill="${CAT.bean}"/>`;
-    [-2.6,0,2.6].forEach((x,i)=>{const q=add(add(m,front?[x,-3.6+(i===1?-.8:0)]:add(pp,[0,0],x)),front?[0,0]:v,front?0:3.6);s+=`<circle cx="${f1(q[0])}" cy="${f1(q[1])}" r="1.15" fill="${CAT.bean}"/>`});
+    const m=front?c:add(c,v,2.5);
+    f+=`<ellipse cx="${f1(m[0])}" cy="${f1(m[1]+1)}" rx="2.6" ry="2.1" fill="${CAT.bean}"/>`;
+    [-2.6,0,2.6].forEach((x,i)=>{const q=front?add(m,[x,-3.6+(i===1?-.8:0)]):add(add(m,pp,x),v,3.6);f+=`<circle cx="${f1(q[0])}" cy="${f1(q[1])}" r="1.15" fill="${CAT.bean}"/>`});
   }
-  return s;
+  return {rim:near?E(`fill="none" stroke="${RIM}" stroke-width="3.2"`):'',fill:f};
 }
 function kb(c,rot,gid){
   return `<g transform="translate(${f1(c[0])} ${f1(c[1])}) rotate(${f1(rot)}) scale(.8)"><path d="M-6 -6 Q-6 -17 0 -17 Q6 -17 6 -6" fill="none" stroke="${EQ2}" stroke-width="4.2" stroke-linecap="round"/><circle r="10.5" cy="1.5" fill="url(#eq${gid})"/><ellipse cx="-3.6" cy="-3" rx="3.4" ry="2.2" fill="${EQHI}" opacity=".7" transform="rotate(-30 -3.6 -3)"/></g>`;
@@ -469,11 +489,11 @@ function tail(hip,tor,front,t,sway,gid){
   const P=(x,y)=>add(add(hip,pp,x),ax,y);
   const a=P(sd*6,1),b=P(sd*(front?26:30),-6),c=P(sd*(front?28:34)+w*.4,20),e=P(sd*(front?17:22)+w,27+Math.abs(w)*.2);
   const d=`M${pt(a)} C${pt(b)} ${pt(c)} ${pt(e)}`;
-  return `<path d="${d}" fill="none" stroke="${front?CAT.far:CAT.base}" stroke-width="7.5" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${CAT.hi}" stroke-width="2" stroke-linecap="round" opacity=".35" transform="translate(-1 -1.2)"/>`;
+  return `<path d="${d}" fill="none" stroke="${front?`url(#ff${gid})`:`url(#fu${gid})`}" stroke-width="7.5" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${CAT.hi}" stroke-width="2" stroke-linecap="round" opacity=".35" transform="translate(-1 -1.2)"/>`;
 }
 function defs(gid){
   const rg=(id,cx,cy,r,stops)=>`<radialGradient id="${id}${gid}" cx="${cx}" cy="${cy}" r="${r}">${stops.map(([o,c])=>`<stop offset="${o}" stop-color="${c}"/>`).join('')}</radialGradient>`;
-  return `<defs>${rg('hd','.36','.3','.85',[[0,'#4F465E'],[.45,'#2E2738'],[1,'#141019']])}${rg('bd','.35','.28','.9',[[0,'#4A4158'],[.5,'#2C2536'],[1,'#120E17']])}${rg('er','.4','.3','.9',[[0,'#423A50'],[1,'#17121D']])}${rg('pw','.38','.3','.85',[[0,'#4B4259'],[1,'#1A1520']])}${rg('ey','.42','.36','.75',[[0,CAT.eyeHi],[.55,CAT.eye],[1,CAT.eyeLo]])}${rg('eq','.36','.3','.8',[[0,'#E6FFFF'],[.45,EQ1],[1,EQ2]])}${rg('sh','.5','.5','.5',[[0,'rgba(120,20,70,.35)'],[1,'rgba(120,20,70,0)']])}</defs>`;
+  return `<defs>${rg('hd','.36','.3','.85',[[0,'#4F465E'],[.45,'#2E2738'],[1,'#141019']])}<radialGradient id="fu${gid}" gradientUnits="userSpaceOnUse" cx="72" cy="70" r="135"><stop offset="0" stop-color="#51475F"/><stop offset=".45" stop-color="#2D2637"/><stop offset="1" stop-color="#110D16"/></radialGradient><radialGradient id="ff${gid}" gradientUnits="userSpaceOnUse" cx="72" cy="70" r="135"><stop offset="0" stop-color="#2C2534"/><stop offset="1" stop-color="#0E0B12"/></radialGradient>${rg('er','.4','.3','.9',[[0,'#423A50'],[1,'#17121D']])}${rg('pw','.38','.3','.85',[[0,'#4B4259'],[1,'#1A1520']])}${rg('ey','.42','.36','.75',[[0,CAT.eyeHi],[.55,CAT.eye],[1,CAT.eyeLo]])}${rg('eq','.36','.3','.8',[[0,'#E6FFFF'],[.45,EQ1],[1,EQ2]])}${rg('sh','.5','.5','.5',[[0,'rgba(120,20,70,.35)'],[1,'rgba(120,20,70,0)']])}</defs>`;
 }
 /* ---- instance with secondary motion ---- */
 let GID=0;
@@ -534,16 +554,16 @@ function create(svg,key,EX,opts={}){
     const mid=add(add(S.hip,S.td,S.tl*.42),[lagX*.2,lagY*.3]);
     const front=S.front,tor=p.tor;
     const bw=(front?19:17.5)*breath/Math.sqrt(squash),bh=(S.tl*.62+7)*squash;
-    let body=`<ellipse cx="${f1(mid[0])}" cy="${f1(mid[1])}" rx="${f1(bw)}" ry="${f1(bh)}" transform="rotate(${f1(tor)} ${f1(mid[0])} ${f1(mid[1])})" fill="url(#bd${gid})"/>`;
+    let body=`<ellipse cx="${f1(mid[0])}" cy="${f1(mid[1])}" rx="${f1(bw)}" ry="${f1(bh)}" transform="rotate(${f1(tor)} ${f1(mid[0])} ${f1(mid[1])})" fill="url(#fu${gid})"/>`;
     const haunch=add(S.hip,S.td,3);
-    body=`<ellipse cx="${f1(haunch[0])}" cy="${f1(haunch[1])}" rx="${f1(front?bw*1.08:bw*1.05)}" ry="${f1(bw*.82)}" transform="rotate(${f1(tor)} ${f1(haunch[0])} ${f1(haunch[1])})" fill="url(#bd${gid})"/>`+body;
+    body=`<ellipse cx="${f1(haunch[0])}" cy="${f1(haunch[1])}" rx="${f1(front?bw*1.08:bw*1.05)}" ry="${f1(bw*.82)}" transform="rotate(${f1(tor)} ${f1(haunch[0])} ${f1(haunch[1])})" fill="url(#fu${gid})"/>`+body;
     const feetX=(S.legN[1][0]+S.legF[1][0])/2;
     const lying=Math.abs(Math.sin(tor*D))>.7&&S.hip[1]>165;
     const sx=lying?S.hip[0]-8:(S.hip[0]+feetX)/2;
     const shadow=`<ellipse cx="${f1(sx)}" cy="${f1(C.ground+1.5)}" rx="${lying?62:front?40:42}" ry="8" fill="url(#sh${gid})"/>`;
     const o=[shadow,trail];
-    const legDraw=(root,lg,spec,near,def,beans,fr)=>{const fa=spec.f!=null?spec.f:def;return tube([root,lg[0],lg[1]],15.5,13,near)+foot(lg[1],fa,near,beans,fr)};
-    const armDraw=(root,am,near)=>tube([root,am[0],am[1]],10.5,9.5,near)+paw(am[1],ang(am[0],am[1]),near);
+    const legDraw=(root,lg,spec,near,def,beans,fr)=>{const fa=spec.f!=null?spec.f:def;const n=noodle(root,lg[0],lg[1],21,14,11.5,near,gid),f=foot(lg[1],fa,near,beans,fr,gid);return n.rim+f.rim+n.fill+f.fill};
+    const armDraw=(root,am,near)=>{const n=noodle(root,am[0],am[1],15,10,8.6,near,gid),pw=paw(am[1],n.dirEnd,near,gid);return n.rim+pw.rim+n.fill+pw.fill};
     const H=head(S.hc,sha,front,st,gid);
     const tl=tail(S.hip,tor,front,t,-lagX*.7,gid);
     if(front){
