@@ -18,7 +18,7 @@
 /* Layout: one-column phone app, berry ink on blush paper; bottom tab bar; full-screen timer overlay */
 :root{
   --bg:#F8E8ED; --surface:#FFF6F8; --surface-2:#F1D6DF; --ink:#3A1426; --muted:#86566A;
-  --line:#EAC6D2; --accent:#C42D67; --accent-ink:#FFF4F7; --soft:#F4B3C8; --rest:#7E5BA8;
+  --line:#EAC6D2; --accent:#C42D67; --accent-ink:#FFF4F7; --soft:#F4B3C8; --rest:#7E5BA8; --fig-far:#CFA5B6; --fig-bg:#FFF6F8;
   --display:'Cormorant',Georgia,'Times New Roman',serif;
   --body:'Golos Text',system-ui,-apple-system,'Segoe UI',sans-serif;
   --num:'Unbounded','Golos Text',system-ui,sans-serif;
@@ -26,10 +26,10 @@
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#1B0C13; --surface:#27121C; --surface-2:#371A27; --ink:#FBE3EB; --muted:#C397A9;
-  --line:#4A2536; --accent:#FF6C9C; --accent-ink:#2A0915; --soft:#7B2C4B; --rest:#B597E0; color-scheme:dark}}
+  --line:#4A2536; --accent:#FF6C9C; --accent-ink:#2A0915; --soft:#7B2C4B; --rest:#B597E0; --fig-far:#6F4357; --fig-bg:#27121C; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#1B0C13; --surface:#27121C; --surface-2:#371A27; --ink:#FBE3EB; --muted:#C397A9;
-  --line:#4A2536; --accent:#FF6C9C; --accent-ink:#2A0915; --soft:#7B2C4B; --rest:#B597E0; color-scheme:dark}
+  --line:#4A2536; --accent:#FF6C9C; --accent-ink:#2A0915; --soft:#7B2C4B; --rest:#B597E0; --fig-far:#6F4357; --fig-bg:#27121C; color-scheme:dark}
 
 *{box-sizing:border-box}
 html,body{background:var(--bg)}
@@ -167,6 +167,29 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
 .done .sum{font-family:var(--num);font-size:15px;color:var(--muted);margin:10px 0 20px}
 .done .chips{justify-content:center}
 
+/* technique */
+.fig{background:var(--surface);border-radius:16px;aspect-ratio:200/204;max-width:100%}
+.fig svg{width:100%;height:100%;display:block}
+.tlink{border:0;background:var(--surface-2);color:var(--accent);font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;margin-left:6px;vertical-align:1px}
+.tech-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.tcard{border:0;background:var(--surface);border-radius:var(--r);padding:8px 8px 12px;text-align:left;display:flex;flex-direction:column;gap:6px;min-width:0}
+.tcard .fig{background:transparent}
+.tcard b{font-weight:600;font-size:14px;line-height:1.25;padding:0 4px}
+.tcard small{color:var(--muted);font-size:12px;padding:0 4px}
+.tech-scrim{z-index:70}
+.tech-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.tech-head h2{margin:0}
+.tech-fig{width:min(100%,280px);margin:14px auto 4px}
+.t-h{font-family:var(--display);font-style:italic;font-weight:600;font-size:22px;margin:18px 0 6px}
+.sheet ol,.sheet ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;max-width:60ch}
+.sheet ul li::marker{color:var(--accent)}
+.t-p{margin:14px 0 0}
+.pl-fig{border:0;padding:0;width:min(38vw,150px);position:relative;flex:none}
+.pl-fig span{position:absolute;right:6px;bottom:6px;font-size:11px;font-weight:600;color:var(--accent);background:var(--bg);padding:2px 8px;border-radius:999px}
+.player.has-fig .ring{width:min(48vw,210px)}
+.player.has-fig .ring b{font-size:clamp(42px,12vw,60px)}
+.player.has-fig .cue{min-height:0}
+.player.has-fig .ex-name{font-size:clamp(28px,7.5vw,38px)}
 @media (prefers-reduced-motion:no-preference){
   .sheet{animation:up .22s ease-out}
   @keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
@@ -205,6 +228,10 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
     <p class="hint" style="margin:0">Таймер ведёт сам: упражнение → отдых → следующее. В конце тренировка запишется в дневник.</p>
     <div id="progList"></div>
     <button class="btn ghost wide" id="newProg">+ Собрать свою программу</button>
+
+    <h2 class="sec">Техника: гиря и гантели</h2>
+    <p class="hint" style="margin:0">Нажми на упражнение: шаги, частые ошибки и дыхание.</p>
+    <div class="tech-grid" id="techGrid"></div>
 
     <details class="backup">
       <summary>Резервная копия данных</summary>
@@ -262,6 +289,19 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
   </form>
 </div>
 
+<!-- technique sheet -->
+<div class="scrim tech-scrim" id="techSheet" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="tName">
+    <div class="tech-head"><h2 id="tName"></h2><span class="chip" id="tEq"></span></div>
+    <div class="fig tech-fig" id="tFig"></div>
+    <p class="t-p"><span class="label">Работают</span><br><span id="tM"></span></p>
+    <h3 class="t-h">Как делать</h3><ol id="tHow"></ol>
+    <h3 class="t-h">Частые ошибки</h3><ul id="tErr"></ul>
+    <p class="t-p"><span class="label">Дыхание</span><br><span id="tBr"></span></p>
+    <button class="btn wide" id="tClose">Понятно</button>
+  </div>
+</div>
+
 <!-- player -->
 <div class="player" id="player" hidden>
   <div class="pl-top"><span class="pl-name" id="plProg"></span><button class="btn ghost small" id="plClose">Завершить</button></div>
@@ -270,6 +310,7 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
     <div class="phase" id="plPhase"></div>
     <h2 class="ex-name" id="plEx"></h2>
     <div class="cue" id="plCue"></div>
+    <button class="fig pl-fig" id="plFig" hidden aria-label="Открыть технику"></button>
     <div class="ring"><svg viewBox="0 0 260 260"><circle class="track" cx="130" cy="130" r="120"/><circle class="prog-arc" id="plArc" cx="130" cy="130" r="120" stroke-dasharray="753.98" stroke-dashoffset="0"/></svg><b id="plTime">0</b></div>
     <div class="next" id="plNext"></div>
   </div>
@@ -289,6 +330,233 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
 </div>
 
 <script>
+/* FIG ENGINE START */
+const FIG=(()=>{
+const L={tor:50,neck:15,head:10,up:28,fo:26,th:42,sh:40,foot:12,sw:17,hw:9};
+const D=Math.PI/180;let BG='#fff';
+const dir=a=>[Math.sin(a*D),-Math.cos(a*D)];
+const add=(p,v,k=1)=>[p[0]+v[0]*k,p[1]+v[1]*k];
+const ang=(a,b)=>Math.atan2(b[0]-a[0],-(b[1]-a[1]))/D;
+function ik(r,t,l1,l2,s){
+  const dx=t[0]-r[0],dy=t[1]-r[1],d=Math.hypot(dx,dy)||0.001;
+  const dm=Math.min(l1+l2-0.01,Math.max(Math.abs(l1-l2)+0.01,d));
+  const c=(l1*l1+dm*dm-l2*l2)/(2*l1*dm);
+  const a=Math.atan2(dy,dx)+s*Math.acos(Math.max(-1,Math.min(1,c)));
+  const j=[r[0]+l1*Math.cos(a),r[1]+l1*Math.sin(a)];
+  const ux=t[0]-j[0],uy=t[1]-j[1],ul=Math.hypot(ux,uy)||1;
+  return [j,[j[0]+l2*ux/ul,j[1]+l2*uy/ul]];
+}
+function limb(root,spec,l1,l2,refs){
+  if(spec.l){l1=spec.l[0];l2=spec.l[1]}
+  if(spec.a)return[add(root,dir(spec.a[0]),l1),add(add(root,dir(spec.a[0]),l1),dir(spec.a[1]),l2)];
+  const base=spec.rel?refs[spec.rel]:[0,0];
+  return ik(root,[base[0]+spec.t[0],base[1]+spec.t[1]],l1,l2,spec.s||1);
+}
+function mirrorSpec(sp,cx){
+  if(!sp)return sp;const o={...sp};
+  if(sp.a)o.a=sp.a.map(a=>-a);
+  if(sp.t)o.t=sp.rel?[-sp.t[0],sp.t[1]]:[2*cx-sp.t[0],sp.t[1]];
+  if(sp.s)o.s=-sp.s;
+  if(sp.f!=null)o.f=-sp.f;
+  return o;
+}
+function lerp(a,b,k){
+  if(typeof a==='number')return a+(b-a)*k;
+  if(Array.isArray(a))return a.map((x,i)=>lerp(x,b[i],k));
+  if(a&&typeof a==='object'){const o={};for(const key in a)o[key]=(b&&key in b)?lerp(a[key],b[key],k):a[key];return o}
+  return a;
+}
+function poseAt(ex,t){
+  const ks=ex.k,T=ex.dur;let u=(t%T)/T;
+  for(let i=0;i<ks.length-1;i++){
+    if(u>=ks[i][0]&&u<=ks[i+1][0]){const span=ks[i+1][0]-ks[i][0]||1;let k=(u-ks[i][0])/span;k=k*k*(3-2*k);return lerp(ks[i][1],ks[i+1][1],k)}
+  }
+  return ks[0][1];
+}
+const seg=(a,b,w,c,op)=>`<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"${op?` opacity="${op}"`:''}/>`;
+function kb(c,col,rot=0){
+  return `<g transform="translate(${c[0].toFixed(1)} ${c[1].toFixed(1)}) rotate(${rot.toFixed(1)})"><path d="M-5 -6 Q-5 -15 0 -15 Q5 -15 5 -6" fill="none" stroke="${col}" stroke-width="2.6"/><circle r="8.5" cy="1" fill="${col}"/></g>`;
+}
+function db(c,a,col,mode){
+  if(mode==='end')return `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="6.5" fill="${col}"/><circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="2.2" fill="${BG}"/>`;
+  const v=dir(a),p1=add(c,v,-9),p2=add(c,v,9);
+  return seg(p1,p2,3,col)+seg(add(p1,v,-1),add(p1,v,2),11,col)+seg(add(p2,v,-2),add(p2,v,1),11,col);
+}
+function render(p,C){
+  const out=[];const G=C.ground;BG=C.bg;
+  out.push(`<line x1="8" y1="${G}" x2="192" y2="${G}" stroke="${C.line}" stroke-width="2" stroke-linecap="round"/>`);
+  const tl=L.tor*(p.tl||1);
+  const hip=p.hip,td=dir(p.tor),neck=add(hip,td,tl);
+  const head=add(neck,dir(p.head??p.tor),L.neck);
+  const front=p.v==='front';
+  const perp=[Math.cos(p.tor*D),Math.sin(p.tor*D)];
+  const sh={l:front?add(neck,perp,-L.sw):neck,r:front?add(neck,perp,L.sw):neck};
+  const hp={l:front?add(hip,perp,-L.hw):hip,r:front?add(hip,perp,L.hw):hip};
+  const refs={shoulder:neck,hip};
+  const an=p.an,lf=p.ln;
+  const af=p.symA?mirrorSpec(an,hip[0]):p.af, ff=p.sym?mirrorSpec(lf,hip[0]):p.lf;
+  const legN=limb(hp.l,lf,L.th,L.sh,refs),legF=limb(hp.r,ff,L.th,L.sh,refs);
+  const armN=limb(sh.l,an,L.up,L.fo,refs),armF=limb(sh.r,af,L.up,L.fo,refs);
+  const foot=(leg,spec,root,def)=>{const fa=spec.f!=null?spec.f:def;return seg(leg[1],add(leg[1],dir(fa),L.foot),7,'C')};
+  const drawLeg=(root,leg,spec,col,op,def)=>seg(root,leg[0],10,col,op)+seg(leg[0],leg[1],9,col,op)+foot(leg,spec,root,def).replace('"C"',`"${col}"`).replace('/>',op?` opacity="${op}"/>`:'/>');
+  const drawArm=(root,arm,col,op)=>seg(root,arm[0],8,col,op)+seg(arm[0],arm[1],7.5,col,op);
+  const eq=p.eq,EQ=[];
+  if(eq){
+    const hand=eq.at==='hf'?armF:armN;
+    const fa=ang(hand[0],hand[1]);
+    const pts=eq.at==='both'?[armN,armF]:[hand];
+    if(eq.type==='kb'){
+      let c,rot=0;
+      if(eq.at==='hip')c=add(hip,[eq.o?eq.o[0]:0,eq.o?eq.o[1]:-12]);
+      else if(eq.at==='mid'){c=[(armN[1][0]+armF[1][0])/2,(armN[1][1]+armF[1][1])/2+8]}
+      else if(eq.mode==='arm'){c=add(hand[1],dir(fa),11);rot=fa-180}
+      else c=add(hand[1],[0,9]);
+      EQ.push(kb(c,C.acc,rot));
+    }else{
+      pts.forEach(h=>{const a=ang(h[0],h[1]);
+        if(eq.mode==='h')EQ.push(db(h[1],90,C.acc,'bar'));
+        else if(eq.mode==='along')EQ.push(db(add(h[1],dir(a),3),a,C.acc,'bar'));
+        else EQ.push(db(h[1],0,C.acc,'end'))});
+    }
+  }
+  const torso=front
+    ?`<polygon points="${[sh.l,sh.r,hp.r,hp.l].map(q=>q.map(n=>n.toFixed(1)).join(',')).join(' ')}" fill="${C.ink}" stroke="${C.ink}" stroke-width="7" stroke-linejoin="round"/>`
+    :seg(hip,neck,15,C.ink);
+  const headC=`<circle cx="${head[0].toFixed(1)}" cy="${head[1].toFixed(1)}" r="${L.head}" fill="${C.ink}"/>`;
+  if(front){
+    const legs=drawLeg(hp.l,legN,lf,C.ink,0,p.fl??-100)+drawLeg(hp.r,legF,ff,C.ink,0,p.fl!=null?-p.fl:100);
+    if(p.legsFront)out.push(torso,headC,`<g stroke="${C.bg}" stroke-width="3">`+legs.replace(/stroke="[^"]*" stroke-width="(\d+\.?\d*)"/g,(m,w)=>`stroke="${C.bg}" stroke-width="${+w+4}"`)+'</g>',legs);
+    else out.push(legs,torso,headC);
+    if(eq&&eq.behind)out.push(...EQ);
+    out.push(drawArm(sh.l,armN,C.ink),drawArm(sh.r,armF,C.ink));
+    if(!(eq&&eq.behind))out.push(...EQ);
+  }else{
+    out.push(drawArm(sh.r,armF,C.far,.9),drawLeg(hp.r,legF,ff,C.far,.9,90),torso,drawLeg(hp.l,legN,lf,C.ink,0,90));
+    if(!p.headTop)out.push(headC);
+    out.push(drawArm(sh.l,armN,C.ink),...EQ);
+    if(p.headTop)out.push(headC);
+  }
+  return out.join('');
+}
+return {render,poseAt};
+})();
+/* FIG ENGINE END */
+/* EX DATA START */
+const SIDE_LEGS={ln:{t:[102,180],s:-1},lf:{t:[106,180],s:-1}};
+const FRONT_LEGS={ln:{t:[88,180],s:1},sym:1};
+const EX={
+ swing:{dur:2.2,k:(()=>{
+  const hike={v:'side',hip:[80,110],tor:62,head:50,ln:{t:[100,180],s:-1},lf:{t:[104,180],s:-1},an:{a:[205,205]},af:{a:[203,203]},eq:{type:'kb',at:'hn',mode:'arm'}};
+  const top={...hike,hip:[100,99],tor:-4,head:-2,an:{a:[88,88]},af:{a:[90,90]}};
+  return [[0,hike],[0.45,top],[0.55,top],[1,hike]]})()},
+ goblet:{dur:3,k:(()=>{
+  const st={v:'side',hip:[100,99],tor:0,head:0,...SIDE_LEGS,an:{t:[16,10],rel:'shoulder',s:1},af:{t:[18,10],rel:'shoulder',s:1},eq:{type:'kb',at:'hn',mode:'down'}};
+  const bt={...st,hip:[82,142],tor:30,head:18};
+  return [[0,st],[0.15,st],[0.55,bt],[0.68,bt],[1,st]]})()},
+ row:{dur:2.6,k:(()=>{
+  const dn={v:'side',hip:[82,110],tor:72,head:62,ln:{t:[100,180],s:-1},lf:{t:[104,180],s:-1},an:{a:[182,180]},af:{t:[-24,42],rel:'shoulder',s:1},eq:{type:'kb',at:'hn',mode:'down'}};
+  const up={...dn,an:{a:[255,182]}};
+  return [[0,dn],[0.15,dn],[0.5,up],[0.62,up],[1,dn]]})()},
+ bridge:{dur:2.6,k:(()=>{
+  const dn={v:'side',hip:[100,177],tor:270,head:270,ln:{t:[128,180],s:-1},lf:{t:[131,180],s:-1},an:{t:[0,-11],rel:'hip',s:-1},af:{t:[2,-11],rel:'hip',s:-1},eq:{type:'kb',at:'hip',o:[0,-14]}};
+  const up={...dn,hip:[92,148],tor:234.5,head:270};
+  return [[0,dn],[0.15,dn],[0.5,up],[0.65,up],[1,dn]]})()},
+ twist:{dur:2.4,k:(()=>{
+  const base={v:'front',hip:[100,172],tor:0,tl:.9,head:0,ln:{a:[-9,191],l:[34,43]},sym:1,legsFront:1,fl:-100,eq:{type:'kb',at:'mid'}};
+  const L={...base,tor:-12,head:-18,an:{t:[56,150],s:-1},af:{t:[63,150],s:1}};
+  const R={...base,tor:12,head:18,an:{t:[137,150],s:-1},af:{t:[144,150],s:1}};
+  return [[0,L],[0.1,L],[0.5,R],[0.6,R],[1,L]]})()},
+ press:{dur:2.6,k:(()=>{
+  const rack={v:'front',hip:[100,99],tor:0,head:0,...FRONT_LEGS,an:{t:[66,38],s:-1},symA:1,eq:{type:'db',at:'both',mode:'h'}};
+  const top={...rack,an:{t:[82,-3],s:-1}};
+  return [[0,rack],[0.12,rack],[0.5,top],[0.6,top],[1,rack]]})()},
+ lateral:{dur:2.6,k:(()=>{
+  const dn={v:'front',hip:[100,99],tor:0,head:0,...FRONT_LEGS,an:{a:[192,184]},symA:1,eq:{type:'db',at:'both',mode:'end'}};
+  const up={...dn,an:{a:[264,262]}};
+  return [[0,dn],[0.12,dn],[0.5,up],[0.6,up],[1,dn]]})()},
+ curl:{dur:2.4,k:(()=>{
+  const dn={v:'side',hip:[100,99],tor:0,head:0,...SIDE_LEGS,an:{a:[178,178]},af:{a:[176,176]},eq:{type:'db',at:'both',mode:'end'}};
+  const up={...dn,an:{a:[176,30]},af:{a:[174,32]}};
+  return [[0,dn],[0.12,dn],[0.5,up],[0.6,up],[1,dn]]})()},
+ triceps:{dur:2.6,k:(()=>{
+  const dn={v:'side',hip:[100,99],tor:0,head:0,headTop:1,...SIDE_LEGS,an:{a:[8,200]},af:{a:[6,198]},eq:{type:'db',at:'hn',mode:'along'}};
+  const up={...dn,an:{a:[8,368]},af:{a:[6,366]}};
+  return [[0,dn],[0.12,dn],[0.5,up],[0.6,up],[1,dn]]})()},
+ pushup:{dur:2.4,k:(()=>{
+  const up={v:'side',hip:[84.2,157.1],tor:57,head:62,ln:{t:[10.4,169.6],s:-1,f:200},lf:{t:[14,168],s:-1,f:200},an:{t:[130,183],s:1},af:{t:[134,183],s:1}};
+  const dn={...up,hip:[90,170.9],tor:77.5,head:80};
+  return [[0,up],[0.12,up],[0.5,dn],[0.6,dn],[1,up]]})()}
+};
+/* EX DATA END */
+/* TECH START */
+const TECH=[
+ {k:'swing',n:'Махи гирей',eq:'Гиря',m:'Ягодицы, задняя поверхность бедра, корпус',
+  how:['Стопы чуть шире плеч, гиря стоит на полу сантиметрах в 30 перед тобой.','Наклонись, отводя таз назад, возьми гирю и закинь её между ног, как пас назад.','Резко выпрями таз и сожми ягодицы: гиря поднимается по инерции до уровня груди.','Дай гире упасть сама и встреть её наклоном: таз уходит назад, колени лишь слегка согнуты.'],
+  err:['Поднимать гирю руками и плечами вместо толчка тазом.','Приседать вместо наклона: колени уходят вперёд, работают бёдра, а не ягодицы.','Округлять спину в нижней точке.','Отклоняться назад наверху: корпус должен закончить ровной вертикалью.'],
+  br:'Резкий выдох в верхней точке, вдох на спуске.'},
+ {k:'goblet',n:'Гоблет-присед',eq:'Гиря',m:'Ягодицы, квадрицепсы, корпус',
+  how:['Держи гирю за рожки у груди, локти смотрят вниз.','Стопы на ширине плеч, носки слегка развёрнуты наружу.','Опускайся между пятками: таз назад и вниз, колени идут по линии носков.','Внизу локти касаются внутренней стороны коленей. Пауза секунда, вставай через пятки.'],
+  err:['Колени сводятся внутрь при подъёме.','Пятки отрываются от пола.','Гиря отходит от груди, и спина округляется.'],
+  br:'Вдох на спуске, выдох на подъёме.'},
+ {k:'row',n:'Тяга в наклоне',eq:'Гиря',m:'Широчайшие, мышцы между лопатками, задняя дельта',
+  how:['Обопрись свободной рукой о бедро или стул, спина ровная, почти параллельна полу.','Гиря висит под плечом, рука прямая.','Тяни локоть назад к бедру, сводя лопатку к позвоночнику.','Медленно опусти гирю до полного выпрямления руки. Потом другая сторона.'],
+  err:['Разворачивать корпус, чтобы закинуть гирю рывком.','Тянуть кистью и бицепсом: ведёт локоть.','Поднимать плечо к уху.'],
+  br:'Выдох, когда тянешь вверх.'},
+ {k:'bridge',n:'Ягодичный мост с гирей',eq:'Гиря',m:'Ягодицы, задняя поверхность бедра',
+  how:['Лёжа на спине, стопы на ширине таза, пятки недалеко от ягодиц.','Положи гирю на тазовые косточки и придерживай руками.','Поднимай таз до прямой линии от плеч до коленей.','Наверху сожми ягодицы на 1–2 секунды и медленно опустись.'],
+  err:['Прогибать поясницу наверху вместо того, чтобы дожимать ягодицами.','Толкаться носками: вес на пятках.','Колени разваливаются наружу или сводятся.'],
+  br:'Выдох на подъёме таза.'},
+ {k:'twist',n:'Русский твист',eq:'Гиря',m:'Косые мышцы живота, пресс',
+  how:['Сядь, колени согнуты, стопы на полу. Сложнее: стопы на весу.','Отклонись назад, спина прямая, гиря у груди.','Поворачивай грудную клетку и переноси гирю к одному бедру, потом к другому.','Таз и колени остаются на месте, поворачивается только корпус.'],
+  err:['Двигать одними руками, а корпус стоит на месте.','Круглая спина.','Слишком быстрый темп: теряется контроль.'],
+  br:'Выдох на каждом повороте.'},
+ {k:'press',n:'Жим вверх стоя',eq:'Гантели',m:'Дельты, трицепс, корпус',
+  how:['Стопы на ширине таза, гантели у плеч, локти чуть впереди корпуса.','Подкрути таз, напряги пресс и ягодицы.','Выжимай вверх, пока руки не выпрямятся над головой, бицепсы у ушей.','Медленно опусти гантели обратно к плечам.'],
+  err:['Прогиб в пояснице: рёбра раскрываются.','Подталкивать вес ногами.','Плечи поднимаются к ушам.'],
+  br:'Выдох на жиме вверх.'},
+ {k:'lateral',n:'Разведения в стороны',eq:'Гантели',m:'Средняя дельта',
+  how:['Гантели по бокам, локти слегка согнуты, корпус неподвижен.','Поднимай руки в стороны до уровня плеч. Ведёт локоть, не кисть.','Наверху мизинец не выше большого пальца.','Опускай медленно, за 2–3 секунды.'],
+  err:['Раскачиваться корпусом.','Поднимать выше плеч и задирать трапецию.','Брать слишком тяжёлый вес.'],
+  br:'Выдох на подъёме рук.'},
+ {k:'curl',n:'Сгибания на бицепс',eq:'Гантели',m:'Бицепс, плечевая мышца',
+  how:['Стоя, локти прижаты к бокам, ладони смотрят вперёд.','Сгибай руки и поднимай гантели к плечам.','Наверху на секунду сожми бицепс.','Опускай медленно и до конца, до прямых рук.'],
+  err:['Локти уходят вперёд.','Помогать себе раскачкой спины.','Неполная амплитуда внизу.'],
+  br:'Выдох на подъёме.'},
+ {k:'triceps',n:'Разгибания из-за головы',eq:'Гантели',m:'Трицепс',
+  how:['Возьми одну гантель двумя руками и подними над головой.','Опускай гантель за голову, сгибая только локти.','Локти смотрят вперёд-вверх и не разъезжаются.','Выпрями руки вверх.'],
+  err:['Локти расходятся в стороны.','Прогиб в пояснице: подкрути таз, напряги пресс.','Двигаются плечи вместо локтей.'],
+  br:'Вдох вниз, выдох на разгибании.'},
+ {k:'pushup',n:'Отжимания с колен',eq:'Без веса',m:'Грудные, трицепс, передняя дельта',
+  how:['Колени на коврике, ладони чуть шире плеч.','Тело одной линией от колен до макушки.','Опускай грудь к полу, локти уходят назад под углом около 45° к телу.','Оттолкнись от пола и выпрями руки.'],
+  err:['Таз провисает или торчит вверх.','Локти разведены в стороны под 90°.','Голова тянется к полу раньше груди.'],
+  br:'Вдох вниз, выдох на подъёме.'}
+];
+const techFor=name=>{const n=String(name||'').toLowerCase();return TECH.find(t=>n.startsWith(t.n.toLowerCase()))};
+
+const FIGS=new Set();let figRaf=0,figColors=null,figColorAge=0;
+const reduceMotion=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+function figColorsFor(el){const cs=getComputedStyle(el),g=v=>cs.getPropertyValue(v).trim();return{ink:g('--ink'),far:g('--fig-far'),acc:g('--accent'),line:g('--line'),bg:g('--fig-bg'),ground:184}}
+function mountFig(host,key){
+  host.innerHTML=`<svg viewBox="0 -14 200 204" role="img" aria-label="Анимация техники"><g></g></svg>`;
+  const f={host,g:host.querySelector('g'),key,t0:performance.now(),vis:true};
+  if(reduceMotion){f.g.innerHTML=FIG.render(FIG.poseAt(EX[key],EX[key].dur*0.5),figColorsFor(host));return f}
+  FIGS.add(f);
+  if('IntersectionObserver' in window){const io=new IntersectionObserver(es=>es.forEach(e=>f.vis=e.isIntersecting));io.observe(host);f.io=io}
+  if(!figRaf)figRaf=requestAnimationFrame(figLoop);
+  return f;
+}
+function figLoop(now){
+  figRaf=0;
+  for(const f of FIGS){
+    if(!f.host.isConnected||!f.g.isConnected){FIGS.delete(f);f.io&&f.io.disconnect();continue}
+    if(!f.vis||f.host.closest('[hidden]'))continue;
+    if(!f.c||(now-(f.cAt||0))>1000){f.c=figColorsFor(f.host);f.cAt=now}
+    const ex=EX[f.key];f.g.innerHTML=FIG.render(FIG.poseAt(ex,(now-f.t0)/1000),f.c);
+  }
+  if(FIGS.size)figRaf=requestAnimationFrame(figLoop);
+}
+/* TECH END */
+
 const $=s=>document.querySelector(s);
 const TYPES=[['pilates','Пилатес'],['rope','Скакалка'],['dance','Танцы'],['yoga','Йога'],['weights','Гиря и гантели'],['stretch','Растяжка'],['other','Другое']];
 const typeName=k=>(TYPES.find(t=>t[0]===k)||TYPES[6])[1];
@@ -461,11 +729,12 @@ function renderProgs(){
     return `<article class="prog"><div class="prog-top"><h3>${esc(p.name)}</h3><span class="chip${p.mine?' mine':''}">${p.mine?'моя':esc(typeName(p.type))}</span></div>
       <div class="prog-meta">≈ ${fmtMin(t)} мин · ${p.items.length} ${plural(p.items.length,'упражнение','упражнения','упражнений')} · ${p.rounds} ${plural(p.rounds,'круг','круга','кругов')}</div>
       ${p.desc?`<p>${esc(p.desc)}</p>`:''}
-      <details class="ex"><summary>Состав</summary><ol>${p.items.map(it=>`<li>${esc(it.n)} <span>· ${fmtS(it.w)}${it.r?' / отдых '+fmtS(it.r):''}</span></li>`).join('')}</ol></details>
+      <details class="ex"><summary>Состав</summary><ol>${p.items.map(it=>{const t=techFor(it.n);return `<li>${esc(it.n)} <span>· ${fmtS(it.w)}${it.r?' / отдых '+fmtS(it.r):''}</span>${t?`<button class="tlink" data-tech="${t.k}">техника</button>`:''}</li>`}).join('')}</ol></details>
       <div class="prog-actions"><button class="btn" data-start="${p.id}">Начать</button>${p.mine?`<button class="btn ghost" data-edit="${p.id}">Изменить</button>`:`<button class="btn ghost" data-copy="${p.id}">Сделать свою версию</button>`}</div></article>`;
   }).join('');
 }
 $('#progList').addEventListener('click',e=>{
+  const tb=e.target.closest('[data-tech]');if(tb)return openTech(tb.dataset.tech);
   const s=e.target.closest('[data-start]');if(s)return startProgram(s.dataset.start);
   const ed=e.target.closest('[data-edit]');if(ed)return openEditor(S.programs.find(p=>p.id===ed.dataset.edit));
   const cp=e.target.closest('[data-copy]');if(cp){const src=PRESETS.find(p=>p.id===cp.dataset.copy);openEditor({...JSON.parse(JSON.stringify(src)),id:null,name:src.name+' (моя)'})}
@@ -525,6 +794,11 @@ function drawStep(){
   const n=nextWork(s.kind==='prep'?1:P.i);
   $('#plNext').innerHTML=s.kind==='rest'?'':(n?`Дальше: <strong>${esc(n.n)}</strong>`:'Последнее упражнение');
   $('#plBar').style.width=(P.i/(P.st.length-1)*100)+'%';
+  const exName=s.kind==='work'?s.n:(nextWork(P.i)||{}).n;
+  const t=techFor(exName),pf=$('#plFig');
+  $('#player').classList.toggle('has-fig',!!t);pf.hidden=!t;
+  if(t&&pf.dataset.k!==t.k){pf.dataset.k=t.k;mountFig(pf,t.k);pf.insertAdjacentHTML('beforeend','<span>техника</span>')}
+  if(!t){pf.dataset.k='';pf.innerHTML=''}
 }
 function drawTime(){
   const s=P.st[P.i];const left=Math.max(0,P.left);const sec=Math.ceil(left);
@@ -568,6 +842,28 @@ $('#plSave').onclick=()=>{
 };
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&P&&P.running)lockScreen()});
 
+/* ---------- technique ---------- */
+let techResume=false;
+function openTech(k){
+  const t=TECH.find(x=>x.k===k);if(!t)return;
+  $('#tName').textContent=t.n;$('#tEq').textContent=t.eq;$('#tM').textContent=t.m;$('#tBr').textContent=t.br;
+  $('#tHow').innerHTML=t.how.map(x=>`<li>${esc(x)}</li>`).join('');
+  $('#tErr').innerHTML=t.err.map(x=>`<li>${esc(x)}</li>`).join('');
+  techResume=false;
+  if(P&&P.running&&!$('#player').hidden){P.running=false;setPlayIcon();techResume=true}
+  $('#techSheet').hidden=false;mountFig($('#tFig'),k);$('#techSheet .sheet').scrollTop=0;
+}
+function closeTech(){$('#techSheet').hidden=true;$('#tFig').innerHTML='';if(techResume&&P){P.running=true;P.last=performance.now();setPlayIcon()}techResume=false}
+$('#tClose').onclick=closeTech;
+$('#techSheet').addEventListener('click',e=>{if(e.target.id==='techSheet')closeTech()},true);
+$('#plFig').onclick=()=>{const k=$('#plFig').dataset.k;if(k)openTech(k)};
+function renderTechGrid(){
+  const g=$('#techGrid');
+  g.innerHTML=TECH.map(t=>`<button class="tcard" data-tech="${t.k}"><div class="fig" data-fig="${t.k}"></div><b>${esc(t.n)}</b><small>${esc(t.eq)}</small></button>`).join('');
+  g.querySelectorAll('[data-fig]').forEach(el=>mountFig(el,el.dataset.fig));
+}
+$('#techGrid').addEventListener('click',e=>{const b=e.target.closest('[data-tech]');if(b)openTech(b.dataset.tech)});
+
 /* ---------- backup ---------- */
 $('#copyData').onclick=()=>{
   const txt=JSON.stringify(S);
@@ -593,7 +889,7 @@ function showTab(t){
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 $('#addBtn').onclick=()=>openEntry();
 
-renderLog();renderProgs();
+renderLog();renderProgs();renderTechGrid();
 let startTab='log';try{startTab=localStorage.getItem(KEY+'.tab')||'log'}catch(e){}
 showTab(location.hash==='#programs'?'prog':startTab);
 </script>
