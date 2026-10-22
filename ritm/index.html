@@ -169,6 +169,21 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
 .pl-title{display:flex;flex-direction:column;min-width:0;gap:1px}
 .pl-count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .pl-name{color:var(--ink)!important;font-weight:600}
+.pl-acts{display:flex;gap:8px;align-items:center;flex:none}
+.pl-voice{width:40px;height:40px;border-radius:50%;border:0;background:var(--surface);color:var(--accent);display:grid;place-items:center;padding:0;box-shadow:inset 0 0 0 1.5px var(--line)}
+.pl-voice svg{width:21px;height:21px}
+.pl-voice[aria-pressed="false"]{color:var(--muted)}
+.coach{margin-top:14px;background:var(--surface);border-radius:var(--r);padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;align-items:center}
+.coach-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.coach-txt b{font-weight:600}
+.coach-txt span{font-size:13px;color:var(--muted)}
+.coach-test{justify-self:start;font-size:14px}
+.coach-note{grid-column:1/-1;font-size:13px;color:var(--accent)}
+.vswitch{width:52px;height:32px;border-radius:999px;border:0;background:var(--line);position:relative;padding:0;transition:background .2s}
+.vswitch i{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(60,10,30,.25);transition:transform .2s}
+.vswitch[aria-checked="true"]{background:var(--accent)}
+.vswitch[aria-checked="true"] i{transform:translateX(20px)}
+.speaking .pl-voice{box-shadow:inset 0 0 0 1.5px var(--line),0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
 .pl-close{border:0;background:var(--surface);color:var(--ink);font-weight:600;font-size:14px;padding:9px 16px;border-radius:999px;box-shadow:inset 0 0 0 1.5px var(--line)}
 .pill{border:0;background:var(--surface);color:var(--accent);font-weight:600;font-size:14px;padding:9px 16px;border-radius:999px;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--accent) 35%,transparent)}
 .phase{display:inline-block;padding:5px 12px;border-radius:999px;background:color-mix(in srgb,var(--accent) 13%,transparent)}
@@ -242,6 +257,12 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
   <section id="view-prog" hidden>
     <h2 class="sec" style="margin-top:4px">Домашние программы</h2>
     <p class="hint" style="margin:0">Таймер ведёт сам: упражнение → отдых → следующее. В конце тренировка запишется в дневник.</p>
+    <div class="coach" id="coachCard">
+      <div class="coach-txt"><b>Голос тренера</b><span>Объявляет упражнения и отдых, подсказывает технику по ходу.</span></div>
+      <button class="vswitch" id="voiceSwitch" role="switch" aria-checked="true" aria-label="Голос тренера"><i></i></button>
+      <button class="link coach-test" id="voiceTest">Проверить звук</button>
+      <div class="coach-note" id="voiceNote" hidden></div>
+    </div>
     <div id="progList"></div>
     <button class="btn ghost wide" id="newProg">+ Собрать свою программу</button>
 
@@ -320,7 +341,7 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(
 
 <!-- player -->
 <div class="player" id="player" hidden>
-  <div class="pl-top"><div class="pl-title"><span class="pl-name" id="plProg"></span><span class="pl-count" id="plCount"></span></div><button class="pl-close" id="plClose">Завершить</button></div>
+  <div class="pl-top"><div class="pl-title"><span class="pl-name" id="plProg"></span><span class="pl-count" id="plCount"></span></div><div class="pl-acts"><button class="pl-voice" id="plVoice" aria-label="Голос тренера"></button><button class="pl-close" id="plClose">Завершить</button></div></div>
   <div class="bar"><i id="plBar"></i></div>
   <div class="pl-main" id="plMain">
     <div class="phase" id="plPhase"></div>
@@ -1028,7 +1049,7 @@ function startProgram(id){
   const st=buildSteps(prog);
   P={prog,st,i:0,left:st[0].dur,running:true,last:performance.now(),worked:0,spent:0};
   $('#plProg').textContent=prog.name;$('#plDone').hidden=true;$('#plMain').hidden=false;$('#plCtrl').hidden=false;
-  $('#player').hidden=false;lockScreen();setPlayIcon();drawStep();
+  $('#player').hidden=false;lockScreen();setPlayIcon();drawStep();coachPlan();
   cancelAnimationFrame(P.raf);P.raf=requestAnimationFrame(tick);
 }
 const IC_PAUSE='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4.4" height="14" rx="1.6" fill="currentColor"/><rect x="13.6" y="5" width="4.4" height="14" rx="1.6" fill="currentColor"/></svg>';
@@ -1071,12 +1092,12 @@ function tick(now){
     if(after!==before&&after>0&&after<=3)beep(660,.09);
     if(P.left<=0){go(P.i+1);if(!P)return}
   }
-  drawTime();P.raf=requestAnimationFrame(tick);
+  coachTick();drawTime();P.raf=requestAnimationFrame(tick);
 }
 function go(i){
   if(i>=P.st.length)return finish();
   P.i=Math.max(0,i);P.left=P.st[P.i].dur;
-  beep(P.st[P.i].kind==='work'?990:520,.2);drawStep();drawTime();
+  beep(P.st[P.i].kind==='work'?990:520,.2);drawStep();drawTime();coachPlan();
 }
 function finish(){
   cancelAnimationFrame(P.raf);P.running=false;
@@ -1084,9 +1105,10 @@ function finish(){
   const m=Math.max(1,Math.round(P.spent/60));P.min=m;
   $('#plSum').textContent=`${P.prog.name} · ${m} мин`;
   chips($('#doneFeel'),'dfeel',FEEL,4);beep(1320,.35);
+  say(`Готово! Тренировка завершена, ${m} ${plural(m,'минута','минуты','минут')}. Отметь самочувствие и запиши в дневник.`,true);
 }
-function closePlayer(){if(P)cancelAnimationFrame(P.raf);P=null;$('#player').hidden=true;try{wake&&wake.release()}catch(e){}wake=null}
-$('#plPlay').onclick=()=>{P.running=!P.running;P.last=performance.now();setPlayIcon()};
+function closePlayer(){hush();if(P)cancelAnimationFrame(P.raf);P=null;$('#player').hidden=true;try{wake&&wake.release()}catch(e){}wake=null}
+$('#plPlay').onclick=()=>{P.running=!P.running;P.last=performance.now();setPlayIcon();say(P.running?'Продолжаем.':'Пауза.',true)};
 $('#plSkip').onclick=()=>go(P.i+1);
 $('#plAdd').onclick=()=>{if(P&&P.st[P.i].kind==='rest'){P.left+=15;P.st[P.i]={...P.st[P.i],dur:P.st[P.i].dur+15};drawTime()}};
 $('#plPrev').onclick=()=>{const s=P.st[P.i];go(s.dur-P.left>2?P.i:P.i-1)};
@@ -1098,6 +1120,90 @@ $('#plSave').onclick=()=>{
   save();closePlayer();showTab('log');renderLog();
 };
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&P&&P.running)lockScreen()});
+
+/* ---------- coach voice ---------- */
+const COACH={
+ swing:['Толкай тазом, руки только направляют.','Спина ровная, не приседай.','Наверху сожми ягодицы.','Резкий выдох на каждом махе.'],
+ goblet:['Колени смотрят туда же, куда носки.','Пятки прижаты к полу.','Гиря у груди, спина прямая.','Вставай через пятки.'],
+ row:['Локоть ведёт назад, к бедру.','Плечо подальше от уха.','Корпус не разворачивай.','Вниз опускай медленно.'],
+ bridge:['Наверху сожми ягодицы.','Толкайся пятками, не носками.','Поясницу не прогибай.'],
+ twist:['Поворачивай грудь, а не руки.','Спина прямая.','Медленнее, с контролем.'],
+ press:['Рёбра вниз, пресс включён.','Плечи подальше от ушей.','Поясницу не прогибай.'],
+ lateral:['Ведёт локоть, а не кисть.','Не выше плеч.','Вниз опускай медленно, на три счёта.'],
+ curl:['Локти прижаты к бокам.','Без раскачки.','Опускай до конца.'],
+ triceps:['Локти смотрят вперёд.','Двигаются только предплечья.','Пресс включён, без прогиба.'],
+ pushup:['Тело одной линией.','Локти назад, не в стороны.','К полу идёт грудь, а не голова.']
+};
+const Voice={on:true,v:null,ok:'speechSynthesis' in window};
+try{const x=localStorage.getItem(KEY+'.voice');if(x!==null)Voice.on=x==='1'}catch(e){}
+const vScore=v=>(/enhanced|premium|улучш|natural/i.test(v.name)?4:0)+(/milena|милена|google|irina|svetlana|katya|alena|dariya/i.test(v.name)?2:0)+(v.localService?1:0);
+function pickVoice(){try{const vs=speechSynthesis.getVoices().filter(v=>/^ru/i.test(v.lang));vs.sort((a,b)=>vScore(b)-vScore(a));Voice.v=vs[0]||null;Voice.loaded=speechSynthesis.getVoices().length>0}catch(e){}}
+if(Voice.ok){pickVoice();try{speechSynthesis.addEventListener('voiceschanged',pickVoice)}catch(e){speechSynthesis.onvoiceschanged=pickVoice}}
+const spoken=t=>String(t||'').replace(/\bIII\b/g,'три').replace(/\bII\b/g,'два').replace(/\bI\b/g,'один').replace(/\s*—\s*/g,', ').replace(/·/g,',');
+let speakingN=0;
+function say(text,flush){
+  if(!Voice.on||!Voice.ok||!text)return;
+  try{if(flush)speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(spoken(text));u.lang='ru-RU';if(Voice.v)u.voice=Voice.v;u.rate=1.03;u.pitch=1.05;u.volume=1;
+    u.onstart=()=>{speakingN++;$('#player').classList.add('speaking')};
+    u.onend=u.onerror=()=>{speakingN=Math.max(0,speakingN-1);if(!speakingN)$('#player').classList.remove('speaking')};
+    speechSynthesis.speak(u)}catch(e){}
+}
+function hush(){try{speechSynthesis.cancel()}catch(e){}speakingN=0;$('#player').classList.remove('speaking')}
+function nextTip(k){P.tipI=P.tipI||{};const l=COACH[k];if(!l)return '';const i=P.tipI[k]||0;P.tipI[k]=i+1;return l[i%l.length]}
+const secW=n=>`${n} ${plural(n,'секунда','секунды','секунд')}`;
+/* what to say at the start of the current step, plus timed cues for later in it */
+function coachPlan(){
+  const s=P.st[P.i],d=s.dur,prev=P.st[P.i-1],cues=[];let now='';
+  const nw=nextWork(P.i);const nt=nw&&techFor(nw.n);
+  if(s.kind==='prep'){
+    const f=P.st.find(x=>x.kind==='work');const ft=techFor(f.n);
+    now=`${P.prog.name}. ${f.sec==='warm'?'Начинаем с разминки. ':''}Первое упражнение: ${f.n}. ${ft?nextTip(ft.k):(f.cue||'')}`;
+    P.cueSaid=true;
+  }else if(s.kind==='work'){
+    const t=techFor(s.n);
+    const named=prev&&(prev.kind==='rest'||prev.kind==='prep');
+    now=(named?'':`${s.n}. `)+'Начали!';
+    if(!t&&s.cue&&!P.cueSaid)now+=' '+s.cue;
+    P.cueSaid=false;
+    if(t){if(d>=20)cues.push({at:d*.6,text:nextTip(t.k)});if(d>=60)cues.push({at:d*.3,text:nextTip(t.k)})}
+    else if(d>=90)cues.push({at:d*.5,text:'Половина. Дыши спокойно.'});
+    if(d>=25&&s.sec!=='cool'&&P.prog.type!=='yoga'&&P.prog.type!=='stretch')cues.push({at:10,text:'Ещё десять секунд!'});
+    else if(d>=25)cues.push({at:8,text:'Ещё немного.'});
+  }else{
+    const n=nw?nw.n:'';const tip=nt?nextTip(nt.k):(nw&&nw.cue)||'';
+    if(s.n==='Переход к основной части')now=`Разминка готова. ${P.prog.type==='weights'?'Бери снаряд. ':''}Основная часть. Первое: ${n}. ${tip}`;
+    else if(s.n==='Переход к заминке')now=`Основная часть готова! Теперь заминка. ${n}. ${tip}`;
+    else if(s.n==='Отдых между кругами')now=`Круг ${s.round} готов. Отдых ${secW(d)}. Дальше круг ${s.round+1}: ${n}.`;
+    else{const pw=[...P.st.slice(0,P.i)].reverse().find(x=>x.kind==='work');const base=x=>String(x||'').split(' — ')[0];
+      if(pw&&nw&&nw.n.includes(' — ')&&base(pw.n)===base(nw.n))now=`Меняем сторону: ${nw.n.split(' — ')[1]}.`;
+      else now=d>=8?`Отдых. Дальше: ${n}. ${tip}`:`Дальше: ${n}. ${d>=5&&!nt?'':tip}`}
+    P.cueSaid=!!tip&&!(d<8&&!nt);
+    if(s.n==='Отдых между кругами'){if(d>=40)cues.push({at:d*.55,text:'Восстанови дыхание. Можно попить воды.'});cues.push({at:Math.min(14,d-3),text:tip})}
+    if(d>=10)cues.push({at:5.5,text:'Приготовься.'});
+  }
+  P.cues=cues.filter(c=>c.text&&c.at<d-1).map(c=>({...c,done:false}));
+  say(now.replace(/\s+/g,' ').trim(),true);
+}
+function coachTick(){if(!P||!P.cues)return;for(const c of P.cues){if(!c.done&&P.left<=c.at){c.done=true;say(c.text)}}}
+function syncVoiceUI(){
+  const sw=$('#voiceSwitch'),pv=$('#plVoice');
+  sw.setAttribute('aria-checked',Voice.on);pv.setAttribute('aria-pressed',Voice.on);
+  pv.innerHTML=Voice.on?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L11.6 6c.6-.5 1.4 0 1.4.7v10.6c0 .7-.8 1.2-1.4.7l-4.4-3.5H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z" fill="currentColor"/><path d="M16 9a4.2 4.2 0 0 1 0 6M18.6 6.6a7.6 7.6 0 0 1 0 10.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L11.6 6c.6-.5 1.4 0 1.4.7v10.6c0 .7-.8 1.2-1.4.7l-4.4-3.5H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z" fill="currentColor"/><path d="M16.5 9.5l5 5M21.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+  pv.setAttribute('aria-label',Voice.on?'Выключить голос тренера':'Включить голос тренера');
+  if(!Voice.ok){$('#coachCard').hidden=true;pv.hidden=true}
+}
+function setVoice(on){Voice.on=on;try{localStorage.setItem(KEY+'.voice',on?'1':'0')}catch(e){}if(!on)hush();syncVoiceUI()}
+$('#voiceSwitch').onclick=()=>setVoice(!Voice.on);
+$('#plVoice').onclick=()=>{setVoice(!Voice.on);if(Voice.on&&P)say('Голос включён.',true)};
+$('#voiceTest').onclick=()=>{
+  if(!Voice.on)setVoice(true);pickVoice();
+  const note=$('#voiceNote');
+  if(Voice.loaded&&!Voice.v){note.hidden=false;note.textContent='На этом устройстве нет русского голоса. Его можно скачать в настройках телефона: Универсальный доступ → Устный контент → Голоса → Русский.'}
+  else{note.hidden=false;note.textContent='Не слышно? Проверь громкость и переключатель беззвучного режима сбоку iPhone.'}
+  say('Привет! Я буду вести тренировку: называть упражнения, считать отдых и подсказывать технику.',true);
+};
+syncVoiceUI();
 
 /* ---------- technique ---------- */
 let techResume=false;
