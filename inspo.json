@@ -3,9 +3,15 @@
  "resolved": "https://www.pinterest.com/ulyapenkova/look/",
  "feed": "widgets",
  "user": "ulyapenkova",
- "count": 50,
+ "count": 51,
  "board_total": null,
  "pins": [
+  {
+   "id": "9851692935402468",
+   "img": "https://i.pinimg.com/736x/84/f8/aa/84f8aa6b6a4a708e320d426e29909906.jpg",
+   "title": "",
+   "link": "https://www.pinterest.com/pin/9851692935402468/"
+  },
   {
    "id": "9851692935259576",
    "img": "https://i.pinimg.com/736x/fd/43/8a/fd438a17bda17ce20d27433b58c08ed0.jpg",
