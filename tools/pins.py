@@ -120,7 +120,9 @@ def main():
             errors.append(f"{f}: {e}")
     # keep pins seen on earlier runs so the collection grows past the 50 the feed returns
     try:
-        old = json.load(open("inspo.json")).get("pins", [])
+        prev = json.load(open("inspo.json"))
+        # a new board replaces the old one instead of mixing with it
+        old = prev.get("pins", []) if prev.get("resolved") == url else []
         ids = {p["id"] for p in pins}
         pins += [p for p in old if p["id"] not in ids]
     except Exception:
