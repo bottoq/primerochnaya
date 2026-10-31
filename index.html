@@ -166,6 +166,16 @@ h2{font-family:var(--f-display);font-weight:600;font-size:23px;line-height:1.1;l
 .stylecard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 2px var(--shadow-ui)}
 .stylecard p{margin:0}
 .pal{display:flex;gap:6px;flex-wrap:wrap}
+a.btn{text-decoration:none;color:inherit}
+.wish{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 6px}
+.wish::-webkit-scrollbar{display:none}
+.wish button{flex:0 0 104px;display:flex;flex-direction:column;gap:6px;text-align:left;padding:0;border:0;background:none;transition:transform .2s var(--ease)}
+.wish button:active{transform:scale(.95)}
+.wish .ph{position:relative;height:136px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--sunk)}
+.wish img{width:100%;height:100%;object-fit:cover;display:block}
+.wish .nm{font-size:12px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.wish .done .ph{opacity:.45}
+.wish .ph i{position:absolute;left:6px;bottom:6px;font-style:normal;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--surface)}
 .formula{display:flex;flex-direction:column;gap:2px;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);font-size:14px;transition:transform .2s var(--ease)}
 .formula span{color:var(--muted)}
 .formula:active{transform:scale(.98)}
@@ -458,7 +468,7 @@ async function boot(){
   loadStyle();
 }
 function loadStyle(){fetch("style.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).then(j=>{if(!j||!j.summary)return;
-  if(!S.style||(S.style.updated||0)<(j.updated||0)){S.style=j;lsSet("pr.style",j);if(S.tab==="stylist")render()}}).catch(()=>{})}
+  const o=S.style;if(!o||(o.updated||0)<(j.updated||0)||(o.updated===j.updated&&(o.rev||0)<(j.rev||0))){S.style=j;lsSet("pr.style",j);render()}}).catch(()=>{})}
 
 /* ===================== share / save files ===================== */
 async function shareFile(blob,filename){
@@ -493,7 +503,7 @@ function openSettings(){
       <span class="muted" style="font-size:14px">Всё хранится на телефоне. Раз в пару недель сохраняй копию в «Файлы» или iCloud — тогда гардероб не пропадёт при смене телефона.</span>
       <div class="row"><button class="btn sm" id="bExp">Сохранить копию</button><label class="btn sm" for="bImp">Восстановить из копии</label><input type="file" id="bImp" accept=".json,application/json" hidden></div>
       <span id="bRes" class="muted" style="font-size:13px"></span></div>
-    <div class="field"><span class="label">О приложении</span><span class="muted" style="font-size:14px">${S.items.length} ${plural(S.items.length,"вещь","вещи","вещей")}, ${S.outfits.length} ${plural(S.outfits.length,"образ","образа","образов")}. Работает без интернета, кроме стилиста и распознавания. Версия 14.</span></div>`,sh=>{
+    <div class="field"><span class="label">О приложении</span><span class="muted" style="font-size:14px">${S.items.length} ${plural(S.items.length,"вещь","вещи","вещей")}, ${S.outfits.length} ${plural(S.outfits.length,"образ","образа","образов")}. Работает без интернета, кроме стилиста и распознавания. Версия 15.</span></div>`,sh=>{
     const res=sh.querySelector("#kRes");
     const psel=sh.querySelector("#pmod"),fillP=()=>{const l=lsGet("pr.pmodels",[]),cur=lsGet("pr.pmodel","");psel.innerHTML=l.length?l.map(m=>`<option value="${esc(m)}" ${m===cur?"selected":""}>${esc(m)}</option>`).join(""):`<option value="">Модель подберётся после проверки</option>`;psel.disabled=!l.length};fillP();
     psel.onchange=()=>lsSet("pr.pmodel",psel.value);
@@ -749,6 +759,24 @@ const demoBanner=()=>demo()?`<div class="banner"><span><b>Это пример г
 const FORGOT_DAYS=60;
 function isForgotten(it){if(!it.lastWorn)return true;return (Date.now()-new Date(it.lastWorn).getTime())/864e5>FORGOT_DAYS}
 
+/* wishlist: things to buy for the current style (style.json → missing) */
+const wishGet=()=>lsGet("pr.wish",{});
+function wishList(){const w=wishGet();return((S.style&&S.style.missing)||[]).filter(m=>m.id).map(m=>({...m,done:!!w[m.id]}))}
+function wishHTML(){const l=wishList();if(!l.length||demo()&&!l.length)return"";const left=l.filter(m=>!m.done).length;
+  return`<div class="field"><div class="spread"><span class="label">Хочу · ${S.style.name?esc(S.style.name)+" · ":""}${left} из ${l.length}</span></div>
+    <div class="wish">${l.map(m=>`<button data-wish="${esc(m.id)}" class="${m.done?"done":""}"><span class="ph">${m.img?`<img src="${esc(m.img.replace("/736x/","/236x/"))}" alt="" loading="lazy" referrerpolicy="no-referrer">`:""}${m.done?`<i>куплено</i>`:""}</span><span class="nm">${esc(m.name)}</span></button>`).join("")}</div></div>`}
+function bindWish(){view.querySelectorAll("[data-wish]").forEach(b=>b.onclick=()=>openWish(b.dataset.wish))}
+function openWish(id){const m=wishList().find(x=>x.id===id);if(!m)return;
+  const shops=(m.where||"").split(/,\s*/).filter(Boolean),q=encodeURIComponent(m.q||m.name);
+  const url={"Zara":`https://www.zara.com/ua/uk/search?searchTerm=${q}`,"Mango":`https://shop.mango.com/ua/uk/search?kw=${q}`,"H&M":`https://www2.hm.com/uk_ua/search-results.html?q=${q}`,"Calzedonia":`https://www.calzedonia.com/ua/search?q=${q}`};
+  openSheet(`${hd(esc(m.name))}${m.img?`<div class="preview" style="height:min(100vw,460px)"><img src="${esc(m.img)}" alt="" referrerpolicy="no-referrer"></div><span class="muted" style="font-size:12px">Пин с доски, где есть эта вещь</span>`:""}
+    <div style="font-size:15px">${esc(m.why)}</div>
+    ${shops.length?`<div class="row" style="flex-wrap:wrap">${shops.map(n=>url[n]?`<a class="btn sm" href="${esc(url[n])}" target="_blank" rel="noopener">Найти в ${esc(n)}</a>`:"").join("")}</div>`:""}
+    <div class="row" style="justify-content:flex-end">${m.done?`<button class="btn ghost" id="wUndo">Вернуть в список</button>`:`<button class="btn primary" id="wBuy">Купила — добавить фото</button>`}</div>`,sh=>{
+    const set=v=>{const w=wishGet();if(v)w[id]=Date.now();else delete w[id];lsSet("pr.wish",w)};
+    const bu=sh.querySelector("#wBuy");if(bu)bu.onclick=()=>{set(true);closeSheet(true);render();toast("Отмечено. Сфотографируй вещь");$("#fileIn").click()};
+    const un=sh.querySelector("#wUndo");if(un)un.onclick=()=>{set(false);closeSheet();render()}});
+}
 function renderCloset(){
   const {items}=V();const f=S.filter;
   const counts={};items.forEach(i=>counts[i.cat]=(counts[i.cat]||0)+1);
@@ -757,7 +785,7 @@ function renderCloset(){
   list=list.slice().sort((a,b)=>CATS.findIndex(c=>c.k===a.cat)-CATS.findIndex(c=>c.k===b.cat)||(b.createdAt||0)-(a.createdAt||0));
   const forgotten=items.filter(isForgotten).length;
   const worn=items.reduce((s,i)=>s+(i.wearCount||0),0);
-  view.innerHTML=`${demoBanner()}
+  view.innerHTML=`${demoBanner()}${wishHTML()}
     <div class="stats"><div class="stat"><div class="v">${items.length}</div><div class="k">${plural(items.length,"вещь","вещи","вещей")}</div></div>
       <div class="stat"><div class="v">${V().outfits.length}</div><div class="k">${plural(V().outfits.length,"образ","образа","образов")}</div></div>
       <button class="stat" style="border:0;text-align:left" id="forg" aria-pressed="${f.forgotten}"><div class="v" style="color:${forgotten?"var(--warn)":"inherit"}">${forgotten}</div><div class="k">не носила ${FORGOT_DAYS}+ дн.</div></button></div>
@@ -768,6 +796,7 @@ function renderCloset(){
     ${list.length?`<div class="grid">${list.map(i=>`<button class="tagcard" data-item="${esc(i.id)}">${demo()?`<span class="ex">пример</span>`:""}<div class="ph"><img src="${esc(imgSrc(i))}" alt="" loading="lazy"></div><div class="nm">${esc(i.name)}</div><div class="meta"><span class="label">${esc(CAT[i.cat]||"")}</span><span class="row" style="gap:6px"><span class="dots">${(i.colors||[]).map(c=>`<span class="dot" style="background:${CHEX[c]||"#ccc"}"></span>`).join("")}</span><span class="wear">×${i.wearCount||0}</span></span></div></button>`).join("")}</div>`
       :`<div class="empty"><h2>Ничего не нашлось</h2><span class="muted">Сбрось фильтры или добавь вещь.</span><button class="btn" id="reset">Сбросить фильтры</button></div>`}
     ${!demo()&&worn===0&&items.length>2?`<div class="muted" style="font-size:13px">Отмечай в «Плане», что надела, — появятся счётчики носки и цена за выход.</div>`:""}`;
+  bindWish();
   view.querySelector("#cats").onclick=e=>{const b=e.target.closest(".chip");if(b){f.cat=b.dataset.v;S.anim=true;render()}};
   const cols=view.querySelector("#cols");if(cols)cols.onclick=e=>{const b=e.target.closest(".sw");if(b){f.color=f.color===b.dataset.v?null:b.dataset.v;render()}};
   const q=view.querySelector("#q");q.oninput=e=>{f.q=e.target.value;const pos=q.selectionStart;render();const n=view.querySelector("#q");n.focus();n.setSelectionRange(pos,pos)};
