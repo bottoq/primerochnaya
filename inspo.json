@@ -3,9 +3,21 @@
  "resolved": "https://www.pinterest.com/ulyapenkova/%D0%B3%D0%BE%D1%82%D0%B8%D0%BA-%D0%B3%D0%BB%D0%B0%D0%BC%D1%83%D1%80/",
  "feed": "widgets",
  "user": "ulyapenkova",
- "count": 68,
+ "count": 70,
  "board_total": null,
  "pins": [
+  {
+   "id": "9851692935459155",
+   "img": "https://i.pinimg.com/736x/d9/51/36/d9513659e2d30a452db87cdf69ce5fe5.jpg",
+   "title": "",
+   "link": "https://www.pinterest.com/pin/9851692935459155/"
+  },
+  {
+   "id": "9851692935459153",
+   "img": "https://i.pinimg.com/736x/ae/66/dd/ae66ddaaaed13438e9234fb3d1706e55.jpg",
+   "title": "",
+   "link": "https://www.pinterest.com/pin/9851692935459153/"
+  },
   {
    "id": "9851692935452157",
    "img": "https://i.pinimg.com/736x/d1/09/85/d109854d350773a483a593df46a3c336.jpg",
